@@ -1,1 +1,5 @@
-# test
+Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of a priori tuning effects on individual opinions and beliefs.  What follows is a scientific analysis of mass shooting phenomena in the US.  An open and scientific mind was applied to data to produce information about the aforementioned phenomena both as a learning experience for the author and an informative experience for the public.  No matter what your beliefs are, please keep an open mind as you process the information that follows.
+
+The intent of this analysis is purely scientific and has neither political motive nor personal agenda other than to inform people about the state of mass shooting gun violence in the United States of America.
+
+Gun violence is a pervasive issue in American culture.  This analysis is focused upon mass shootings specifically which are defined as a shooting incident where at least four people are injured and/or killed not including the perpetrator(s) of the gun violence.  It is recommended that this analysis be used to educate oneself on the the statistical facts around mass shootings.  The source of these data are the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.

@@ -1,0 +1,716 @@
+---
+title: "Mass Shooting Gun Violence in the United States of America"
+subtitle: "Exploratory Data Analysis"
+author: "Trevor Schrotz"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    theme: lumen
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
+editor_options:
+  chunk_output_type: inline
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+# Introduction
+
+## Preface
+
+Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of a priori tuning effects on individual opinions and beliefs.  What follows is a scientific analysis of mass shooting phenomena in the US.  An open and scientific mind was applied to data to produce information about the aforementioned phenomena both as a learning experience for the author and an informative experience for the public.  No matter what your beliefs are, please keep an open mind as you process the information that follows.
+
+## Intent
+
+The intent of this analysis is purely scientific and has neither political motive nor personal agenda other than to inform people about the state of mass shooting gun violence in the United States of America.
+
+## Overview
+
+Gun violence is a pervasive issue in American culture.  This analysis is focused upon mass shootings specifically which are defined as a shooting incident where at least four people are injured and/or killed not including the perpetrator(s) of the gun violence.  It is recommended that this analysis be used to educate oneself on the the statistical facts around mass shootings.  The source of these data are the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
+
+# Setup
+
+## Load Libraries
+
+```{r, include=TRUE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(tidytext)
+library(lubridate)
+library(scales)
+library(janitor)
+library(skimr)
+library(tidyquant)
+library(broom)
+library(purrr)
+library(rvest)
+library(tidycensus)
+library(tidygeocoder)
+library(leaflet)
+library(knitr)
+api_key <- Sys.getenv("CENSUS_API_KEY")
+```
+
+## Source Data from the Gun Violence Archive
+
+To get the prolific amount of data from the GVA website, we can employe web scraping to read the html and turn it into a tidy tabular format for analysis.
+
+```{r, include=TRUE, eval=FALSE}
+#2014
+
+# create a tibble with a column of the website page names that we want to scrape
+ms_pages_2014 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shootings/2014",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shootings/2014?page=",c(1:10))))
+
+# use the purrr package to iterate over the column of URLs using the function from the xml2 package
+ms_scrape_2014 <- ms_pages_2014 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+# convert the html into a table again using purrr's map function to interate over the scraped data
+ms_2014_tbl <- map_df(ms_scrape_2014$scrape, ~ html_table(.x))
+
+# repeat for additional URLs
+#2015
+ms_pages_2015 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shootings/2015",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shootings/2015?page=",c(1:13))))
+
+ms_scrape_2015 <- ms_pages_2015 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2015_tbl <- map_df(ms_scrape_2015$scrape, ~ html_table(.x))
+
+
+#2016
+ms_pages_2016 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2016",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:15),"&year=2016")))
+
+ms_scrape_2016 <- ms_pages_2016 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2016_tbl <- map_df(ms_scrape_2016$scrape, ~ html_table(.x))
+
+
+#2017
+ms_pages_2017 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2017",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:13),"&year=2017")))
+
+ms_scrape_2017 <- ms_pages_2017 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2017_tbl <- map_df(ms_scrape_2017$scrape, ~ html_table(.x))
+
+
+#2018
+ms_pages_2018 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2018",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:13),"&year=2018")))
+
+ms_scrape_2018 <- ms_pages_2018 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2018_tbl <- map_df(ms_scrape_2018$scrape, ~ html_table(.x))
+
+
+#2019
+ms_pages_2019 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2019",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:16),"&year=2019")))
+
+ms_scrape_2019 <- ms_pages_2019 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2019_tbl <- map_df(ms_scrape_2019$scrape, ~ html_table(.x))
+
+
+#2019 through 2022
+ms_pages_2019_2022 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/mass-shooting",
+                                       str_c("https://www.gunviolencearchive.org/mass-shooting?page=",c(1:80))))
+
+
+ms_scrape_2019_2022 <- ms_pages_2019_2022 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2019_2022_tbl <- map_df(ms_scrape_2019_2022$scrape, ~ html_table(.x))
+```
+
+## Data Preparation
+
+Stack the scraped datasets, and then store the file locally so that we don't need to continually call on the website. 
+
+```{r, include=TRUE, eval=FALSE}
+complete_tbl <- ms_2014_tbl %>%
+    bind_rows(ms_2015_tbl) %>%
+    bind_rows(ms_2016_tbl) %>%
+    bind_rows(ms_2017_tbl) %>%
+    bind_rows(ms_2018_tbl) %>%
+    bind_rows(ms_2019_tbl) %>%
+    bind_rows(ms_2019_2022_tbl) %>%
+    distinct()
+
+write_rds(complete_tbl, "gva_data.rds")
+```
+
+Read in the saved data file.
+
+```{r, include=TRUE}
+complete_tbl <- read_rds("gva_data.rds") 
+```
+
+Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
+
+```{r cleaning, include=TRUE}
+ms_tbl <- complete_tbl %>% 
+    janitor::clean_names() %>% 
+    select(-operations) %>% 
+    mutate(incident_date = mdy(incident_date),
+           year = year(incident_date),
+           month = month(incident_date, label = T, abbr = T),
+           incident_month = rollforward(incident_date),
+           dow = wday(incident_date, label = TRUE)) %>% 
+    arrange(incident_date)
+```
+
+## Grouping and Summarizing Function
+
+Here I create a function to group and summarize the data in different ways since we will need to do this many times later.
+
+```{r grouping function, include=TRUE}
+group_function <- function(df, ...) {
+    
+    output <- df %>% 
+        group_by(...) %>% 
+        summarize(n_incidents = n(),
+                  n_deaths = sum(number_killed, na.rm = T),
+                  n_injuries = sum(number_injured, na.rm = T),
+                  .groups = "drop")
+    
+    return(output)
+}
+```
+
+# The Data
+
+## First Look
+
+An initial look at a sample of ten rows of the data.  Each row represents one mass shooting incident.  Each incident has its own unique ID, a date, geographic location, and statistics about the number of injuries and deaths as well as some date related data that I added above to assist with analysis.
+
+```{r first look, include=TRUE}
+ms_tbl %>% 
+    sample_n(size = 10)
+```
+
+A broad glimpse of the data.  No data are missing.  Some notable points with regards to the day of the week and perhaps the month.  We see that the data span from Jan 2014 through Sep 2022.  Deaths and injuries range from zero to 59 and 441 respectively, per incident.
+
+```{r first summary, include=TRUE}
+skim(ms_tbl)
+```
+
+```{r first summary main stats, include=FALSE, warning=FALSE, message=FALSE}
+mass_shootings <- ms_tbl %>% 
+    group_function() %>% 
+    pull(n_incidents)
+
+deaths <- ms_tbl %>% 
+    group_function() %>% 
+    pull(n_deaths)
+
+injuries <- ms_tbl %>% 
+    group_function() %>% 
+    pull(n_injuries)
+```
+
+## Initial Summaries
+
+* Since 2014, there have been `r comma(mass_shootings)` mass shootings, `r comma(deaths)` people have died, and there have been `r comma(injuries)` injuries.
+* There is about one death per mass shooting on average.  
+* There are about four injuries per mass shooting event.
+* There are four times more injuries than deaths (4:1 per incident on average).  
+
+```{r initial totals, include=TRUE}
+ms_tbl %>% 
+    group_function() %>% 
+    mutate(inj_death_ratio = n_injuries / n_deaths,
+           death_inc_ratio = n_deaths / n_incidents,
+           inj_inc_ratio = n_injuries / n_incidents)
+```
+
+# Plots and Visualizations
+
+## Mass Shooting Volume and Trend
+
+```{r volume and trend, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(incident_month < floor_date(Sys.Date(), "month")) %>% 
+    group_function(incident_month) %>% 
+    ggplot(aes(incident_month, n_incidents)) +
+    geom_col(fill = "steelblue", color = "gray30", alpha = 0.9) +
+    geom_smooth(method = "loess", se = FALSE, color = "black") +
+    scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+    theme_tq() +
+    scale_color_tq() +
+    labs(title = "Number of Mass Shooting Incidents by Month and Year",
+         subtitle = str_glue("From {min(ms_tbl$incident_date)} through {max(ms_tbl %>% filter(incident_month < floor_date(Sys.Date(), 'month')) %>% pull(incident_date))}"),
+         x = "Month",
+         y = "",
+         caption = str_glue("Mass shooting defined as four or more victims not including perpetrator(s).
+                             Current incomplete month removed."))
+```
+
+Here we see a couple of patterns.  First, the volume of mass shootings is increasing.  Second, there appears to be a seasonal component to when mass shootings occur meaning there is a tendency and pattern to mass shooting volume consistent with the month of the year.
+
+
+## Annual Growth Rate Table
+
+How much have mass shooting incidents, deaths, and injuries been changing over time?  To find out, we can use the geometric mean on the annual rates of change to get a percentage increase or decrease from the prior year.
+
+```{r growth rate table, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+growth_rates <- ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(year) %>% 
+    mutate(across(c(n_incidents:n_injuries), ~. / lag(.), .names = "{.col}_delta")) %>% 
+    drop_na()
+
+gr_table <- growth_rates %>% 
+    select(year, contains("delta")) %>% 
+    mutate(across(contains("delta"), ~. - 1))
+
+gr_table %>% 
+    mutate(across(contains("delta"), ~percent(., accuracy = 0.1))) %>% 
+    gt::gt()
+```
+
+## Annual Growth Rate Graphic
+
+This chart shows how the volume of mass shootings and the resulting deaths and injuries have either increased or decreased over the years.  Anything above zero is an increase from the prior year, and anything below zero is a decrease.
+
+Only two years (2017 and 2018) saw a modest decrease in the number of mass shootings and every other year has seen growth.  Deaths decreased modestly in two years (2017 and 2018), but increased in all other years, and injuries only saw one year of decrease (2018)
+
+```{r growth rate graph, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+gr_table %>% 
+    pivot_longer(cols = contains("delta")) %>% 
+    ggplot(aes(year, value, color = name)) +
+    geom_segment(aes(x = year, xend = year, y = 0, yend = value)) +
+    geom_point(size = 5) +
+    geom_text(aes(label = percent(value, accuracy = 0.1)), size = 3, color = "black", vjust = -1.2) +
+    geom_hline(yintercept = 0, color = "gray30") +
+    expand_limits(x = c(2014, 2022), y = c(-0.25, 0.5)) +
+    scale_y_continuous(labels = label_percent(accuracy = 1)) +
+    theme_tq() +
+    scale_color_tq() +
+    facet_grid(~fct_inorder(name)) +
+    labs(title = "Change in Volume of Mass Shootings, Deaths, and Injuries by Year",
+         x = "",
+         y = "% Change From Prior Year",
+         caption = "current incomplete year removed") +
+    theme(legend.position = "none")
+```
+
+## Total Growth Rate
+
+This is the average growth rate over the entire period of time in total.  Effectively, you can read this summary as the annual average increase in the number of incidents, deaths, and injuries since 2014.  On average, mass shoooting incidents, deaths, and injuries have been growing at a rate of ~14% per year since 2014.
+
+```{r total growth rate table, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+gr_table %>% 
+    mutate("Start Year" = min(year)-1,
+           "End Year" = max(year)) %>% 
+    group_by(`Start Year`, `End Year`) %>% 
+    summarize(across(contains("delta"), ~exp(mean(log(. + 1))) - 1),
+              .groups = "drop") %>% 
+    mutate(across(contains("delta"), ~percent(., accuracy = 0.1))) %>% 
+    pivot_longer(cols = contains("delta"), names_to = "Type", values_to = "Growth Rate") %>% 
+    gt::gt()
+```
+
+## Incidents Annual Volume
+
+How many mass shootings do we see each year?
+
+```{r annual volume, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(year) %>% 
+    ggplot(aes(year, n_incidents, fill = n_incidents)) +
+    geom_col(alpha = 0.6) +
+    geom_text(aes(label = n_incidents), nudge_y = -20) +
+    theme_tq() +
+    scale_fill_gradient(high = "red", low = "blue") +
+    scale_x_continuous(breaks = seq(min(ms_tbl$year), max(ms_tbl$year), by = 1)) +
+    labs(title = "Number of Mass Shootings by Year",
+         subtitle = str_glue("From {min(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))} through {max(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))}"),
+         x = "Year",
+         y = "",
+         caption = "current incomplete year removed") +
+    theme(legend.position = "none")
+```
+
+## Incidents by Month
+
+Which months tend to have more or less mass shootings?
+
+```{r monthly volume, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(month) %>% 
+    ggplot(aes(month, n_incidents, fill = n_incidents)) +
+    geom_col(alpha = 0.6) +
+    geom_text(aes(label = n_incidents), nudge_y = 15) +
+    theme_tq() +
+    scale_fill_gradient(high = "red", low = "blue") +
+    labs(title = "Number of Mass Shootings by Month (Year Over Year)",
+         subtitle = str_glue("From {min(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))} through {max(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))}"),
+         x = "",
+         y = "",
+         caption = "current incomplete year removed") +
+    theme(legend.position = "none")
+```
+
+## Incidents by Weekday
+
+Which days of the week tend to have more or less mass shootings?
+
+```{r day of the week, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(dow) %>% 
+    ggplot(aes(dow, n_incidents, fill = n_incidents)) +
+    geom_col(alpha = 0.6) +
+    geom_text(aes(label = n_incidents), nudge_y = 30) +
+    theme_tq() +
+    scale_fill_gradient(high = "red", low = "blue") +
+    labs(title = "Number of Mass Shootings by Weekday (Year Over Year)",
+         subtitle = str_glue("From {min(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))} through {max(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))}"),
+         x = "",
+         y = "",
+         caption = "current incomplete year removed") +
+    theme(legend.position = "none")
+```
+
+## Month and Weekday Proportions
+
+Here is one more visualization to help us see the number of mass shootings by day of the week and the month in which they occur.  Each row of bars represents 100% of the shootings in the given days and months.
+
+```{r week and month proportionss, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(month, dow) %>% 
+    select(month:n_incidents) %>% 
+    ggplot(aes(fct_rev(month), n_incidents, fill = dow)) +
+    geom_col(position = position_fill(reverse = TRUE), alpha = 0.8) +
+    coord_flip() +
+    scale_y_continuous(labels = scales::label_percent(accuracy = 1)) +
+    theme_tq() +
+    labs(title = "Proportion of Mass Shootings by Month and Weekday, Year Over Year",
+         subtitle = str_glue("From {min(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))} through {max(ms_tbl %>% filter(year < year(Sys.Date())) %>% pull(incident_date))}"),
+         x = "",
+         y = "",
+         caption = "current incomplete year removed",
+         fill = "Day of Week") + 
+    guides(fill = guide_legend(nrow = 1, byrow = TRUE))
+```
+
+## Relationships Between Variables
+
+We have seen that there are some days that have higher numbers of mass shootings as well as some months that are higher than others.  That creates questions.
+
+First, is there a statistically significant relationship between the day of the week when a mass shooting occurs and the month in which the shooting happens?
+
+We can use a chi-squared test of independence to test our question.
+
+```{r chi test one, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+chi_tbl <- ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, month, dow) %>% 
+    select(month:n_incidents)
+
+chi_tbl %>% 
+    table()
+
+chisq_test(x = chi_tbl, formula = dow ~ month)
+```
+
+The answer is that we don't have enough evidence to support the hypothesis that there is a significant relationship between the mass shooting day of the week and the month in which is occurs.  The Sundays in Jun, Jul, and Aug stand out with higher volumes, but there isn't a statistically significant difference in those months and days of the week.
+
+Follow up question.  What proportion of shootings happen in the different sesaons (roughly approximated by season starting month)?
+
+```{r}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, month) %>% 
+    select(month:n_incidents) %>% 
+    summarize(n = n(),
+              winter = sum(n_incidents[month %in% c("Dec","Jan","Feb")]),
+              spring = sum(n_incidents[month %in% c("Mar","Apr","May")]),
+              summer = sum(n_incidents[month %in% c("Jun","Jul","Aug")]),
+              fall =   sum(n_incidents[month %in% c("Sep","Oct","Nov")]),
+              .groups = "drop") %>% 
+    mutate(spring_prop = spring / n,
+           summer_prop = summer / n,
+           fall_prop = fall / n,
+           winter_prop = winter / n) %>% 
+    select(contains("prop")) %>% 
+    mutate(across(everything(), ~ percent(., accuracy = 0.1)))
+```
+
+Mass shootings are approximately 10% more common in the summer months and approximately 10% less likely in the winter when compared to spring and fall months.
+
+Second, is there a significant difference in the number of mass shootings by the day of the week?  Again, we can use a chi-squared test checking for the  goodness of fit where we essentially test the assumption that there is no difference in the proportion of mass shootings by day of the week.  In other words, each day should have proportionally the same volume of mass shootings.
+
+```{r chi test two, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+chi_dow_tbl <- ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, dow) %>% 
+    select(dow:n_incidents)
+
+chi_dow_tbl %>% table()
+
+chisq_test(chi_dow_tbl, 
+           response = dow,
+           p = c("Sun" = 1/7,
+                 "Mon" = 1/7,
+                 "Tue" = 1/7,
+                 "Wed" = 1/7,
+                 "Thu" = 1/7,
+                 "Fri" = 1/7,
+                 "Sat" = 1/7))
+```
+
+The answer here is yes, there is a significant difference in the volume of mass shooting incidents in different days of the week.
+
+Follow up question. What is the proportion of weekend mass shootings?
+
+```{r}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, dow) %>% 
+    select(dow:n_incidents) %>% 
+    summarize(n = n(),
+              sat_sun = sum(n_incidents[dow %in% c("Sat","Sun")]),
+              .groups = "drop") %>% 
+    transmute(weekend_prop = sat_sun / n,
+              weekend_prop = percent(weekend_prop, accuracy = 0.1))
+```
+About 51% of mass shootings occur on weekends.
+
+
+## Seasonality and Trend Exploration
+
+We noted before that there are seasonal trends in the data, so I am going to bring those forward using moving averages which are simply an average of the volume of mass shootings over a given window of time.  In this case, I will use two windows - one for a six month moving average to highlight the seasonality, and a second moving average of 12 months to highlight the trend of increasing numbers of mass shootings.  We appear to have a new post-pandemic normal.
+
+```{r moving averages, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+#this creates a tibble we can use for the moving average analysis
+
+ma_tbl <- ms_tbl %>% 
+    filter(incident_date < floor_date(Sys.Date(), "month")) %>% 
+    arrange(incident_date) %>% 
+    group_function(incident_month)
+
+ma_tbl %>% 
+    ggplot(aes(incident_month, n_incidents)) +
+    geom_col(fill = "steelblue", color = "gray30", alpha = 0.4) +
+    geom_line(data = ma_tbl %>%
+                select(1,2) %>% 
+                mutate(ma_6 = rollmean(n_incidents, k = 6, fill = NA, align = "right")),
+                aes(incident_month, ma_6), color = "#F44336", size = 1.5) +
+    geom_line(data = ma_tbl %>%
+                select(1,2) %>% 
+                mutate(ma_12 = rollmean(n_incidents, k = 12, fill = NA, align = "right")),
+                aes(incident_month, ma_12), color = "black", size = 1.5)+
+    theme_tq() +
+    scale_color_tq() +
+    labs(title = "Mass Shooting Monthly Incident Count Moving Averages",
+         subtitle = "Red line is the 6 month moving average, black line is the 12 month moving average",
+         x = "",
+         y = "Number of Mass Shooting Incidents")
+```
+
+It's now clearer to see the increasing trend in the twelve month moving average line in black, and the seasonal monthly trend of the six month moving average in red.  You can see how the red line moves above and below the black line clearly revealing the seasonal component of mass shootings.
+
+Additionally, we can also see that since 2020, the variability in the number of mass shootings has increased as the red line goes much higher than in previous years.  The is obvious given the increase in volume, but it's worth noting the change in the total system behavior.  Further, whilst 2020 was an aberrant year given the pandemic, assuming a potential relationship between the impact of the pandemic on US society and mass shooting behavior, the prevalance has not returned back to pre-pandemic levels given that we are now in a post-pandemic environment.
+
+## Incidents, Deaths, and Injuries by Month
+
+This is a time series that takes incidents as we have seen previously and lays out deaths and injury volume over time.
+
+```{r death vs injury, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    filter(incident_month < floor_date(Sys.Date(), "month")) %>% 
+    group_function(incident_month) %>% 
+    rename("Incidents" = n_incidents,"Deaths" = n_deaths,"Injuries" = n_injuries) %>% 
+    pivot_longer(cols = -1) %>% 
+    mutate(name = factor(name, levels = c("Incidents","Injuries","Deaths"))) %>% 
+    ggplot(aes(incident_month, value, group = name, color = name)) +
+    geom_line() +
+    geom_point() +
+    geom_smooth(method = "loess", se = FALSE) +
+    scale_x_date(date_labels = "%Y", date_breaks = "3 years") +
+    expand_limits(y = 0) +
+    theme_tq() +
+    scale_color_tq() +
+    facet_wrap(~ name, scales = "free_y") +
+    labs(title = "Number of Mass Shooting Incidents by Month, Injuries and Deaths",
+         subtitle = str_glue("From {min(ms_tbl$incident_date)} through {max(ms_tbl %>% filter(incident_month < floor_date(Sys.Date(), 'month')) %>% pull(incident_date))}"),
+         x = "",
+         y = "") +
+    theme(legend.position = "none")
+```
+
+# US States
+
+## States with No Mass Shootings
+
+Is there a state that has not had a mass shooting?
+
+```{r no shootings, include=TRUE, warning=FALSE, message=FALSE}
+us_states <- tibble("state" = state.name) %>% 
+    bind_cols(tibble("state_code" = state.abb)) %>% 
+    bind_rows(tibble(state = "District of Columbia",
+                     state_code = "DC")) %>% 
+    arrange(state)
+
+ms_states_tbl <- ms_tbl %>% 
+    inner_join(us_states, by = "state") %>% 
+    distinct(state_code)
+
+no_mass_shooting_states <- tibble("state_code" = state.abb,
+                                  "state_name" = state.name) %>% 
+    anti_join(ms_states_tbl, by = "state_code") %>% 
+    pull(state_name)
+
+state_count <- length(no_mass_shooting_states)
+```
+
+Yes, `r state_count` states have not had mass shootings since these data were collected beginning in 2014: `r knitr::combine_words( no_mass_shooting_states)`
+
+## States with the Most Mass Shootings
+
+Let's look a the number of mass shootings by state.  This gives us a look at totals.
+
+```{r state mass shooting volumes, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+ms_tbl %>% 
+    group_function(state) %>% 
+    inner_join(us_states, by = "state") %>% 
+    ggplot(aes(fct_reorder(state, n_incidents), n_incidents)) +
+    geom_col(fill = "steelblue", color = "gray30", alpha = 0.8) +
+    geom_text(aes(label = n_incidents), hjust = -0.1, size = 2.5) +
+    scale_y_continuous(limits = c(0, 420), expand = c(0, 0)) +
+    coord_flip() +
+    theme_tq() +
+    labs(title = "States Ordered by Number of Mass Shootings",
+         subtitle = str_glue("{min(ms_tbl$incident_date)} through {max(ms_tbl$incident_date)}"),
+         x = "",
+         y = "Mass Shootings") +
+    theme(axis.text.y = element_text(size = 6))
+
+state_stats <- ms_tbl %>% 
+    group_function(state) %>% 
+    inner_join(us_states, by = "state") %>% 
+    mutate(incidents_rank = min_rank(desc(n_incidents)))
+
+top_five_states <- state_stats %>% 
+    filter(incidents_rank %in% c(1:5)) %>% 
+    arrange(incidents_rank) %>% 
+    pull(state)
+```
+
+The five states with the greatest number of mass shootings are: `r knitr::combine_words(top_five_states)`.
+
+We should consider proportionally how likely it is to encounter a mass shooting (or being injured or killed) instead of just looking at the total because each state has widely differing total populations.  In other words, given the population of a state, which states have the greatest number of mass shootings (or deaths or injuries) per person?  I will use the 2020 US decennial census population data by state and the number of incidents, injuries, and deaths by state in 2021.  I am including Washington, D.C. as a state.  N.B. Another way to approach this would be to sum all of the years compared to a 2020 population, but I elected to simply choose the most recent complete year on record.
+
+## Most Violent States Per Capita
+
+Which ten states have the most mass shootings, deaths, or injuries per capita? 
+
+```{r population stats by state, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+us_state_pop_tbl <- get_decennial(geography = "state", 
+                       variables = "P1_001N", 
+                       year = 2020)
+
+per_capita_base <- 1e5
+
+per_capita_tbl <- ms_tbl %>% 
+    filter(year == 2021) %>% 
+    group_function(state) %>% 
+    group_by(state) %>% 
+    inner_join(us_state_pop_tbl %>% 
+                   select("state" = NAME, "population" = value), by = "state") %>% 
+    mutate(incidents_per_capita = n_incidents / (population / per_capita_base),
+           deaths_per_capita = n_deaths / (population / per_capita_base),
+           injuries_per_capita = n_injuries / (population / per_capita_base))
+
+per_capita_tbl %>% 
+    select(state, contains("per_capita")) %>% 
+    pivot_longer(cols = contains("per_capita")) %>% 
+    mutate(name = fct_relevel(name, c("incidents_per_capita","deaths_per_capita","injuriess_per_capita"))) %>% 
+    group_by(name) %>% 
+    slice_max(order_by = value, n = 10) %>% 
+    ggplot(aes(reorder_within(x = state, by = value, within = name, fun = sum), value, fill = name)) +
+    geom_col(alpha = 0.8) +
+    geom_text(aes(label = comma(value, accuracy = 0.1)), size = 2.5, hjust = 1.1) +
+    coord_flip() +
+    facet_wrap(~ name, scales = "free") +
+    scale_x_reordered() +
+    scale_y_continuous(label = label_comma(accuracy = 0.1)) +
+    theme_tq() +
+    scale_fill_tq() +
+    labs(title = "Per Capita Mass Shootings, Deaths, and Injuries by US State in 2021",
+         x = "",
+         y = "Per 100,000 People") +
+    theme(axis.text.y = element_text(size = 6),
+          legend.position = "none")
+```
+
+```{r future scrape, include=FALSE, eval=FALSE}
+#Scraping Incident Details - come back to this later - getting a 503 error...
+incident_ids <- ms_tbl %>%
+    distinct(incident_id)
+
+geo_locations_incidents_tbl <- incident_ids %>%
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
+
+geo_scrape <- geo_locations_incidents_tbl %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+geo_locations_tbl <- map_df(geo_scrape$scrape, ~ html_table(.x))
+
+url <- "https://www.gunviolencearchive.org/incident/465117"
+
+test <- httr::GET(url) %>% `$`("content")
+
+test$status_code
+
+test$content
+
+test %>% xml2::read_html() %>% rvest::html_table()
+```
+
+# Summary
+
+What do we know so far?  
+
+Mass shootings incidents are increasing since 2014 at an average annual rate of 14%.  Since 2020, the number of mass shootings has increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
+
+Saturdays and Sundays tend to have more mass shootings, and account for about 50% of the mass shooting weekdays where Monday through Friday account for the remaining 50%.
+
+Summer months account for 35% of mass shootings where winter months account for 15% leaving fall and spring similar at approximately 25% each proportionately.  
+
+Only two of fifty states in the past eight years have not had a mass shooting - Hawaii and North Dakota.  
+
+The top five states (including Washington, DC) with the most total mass shootings since 2014 are `r knitr::combine_words(top_five_states)`.
+
+Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C., in fact, you are three times more likely than the next closest state which is Delaware in 2021.  D.C. is extraordinarily higher, not in total volume, but in the number of mass shootings per person in the D.C. population.  Illinois, which is highest in total volume, also makes the list for states with the highest mass shootings, injuries, and deaths per capita.  The other top volume states, California, Texas, Florida, and Pennsylvania do not share that distinction.
+
+

@@ -1,0 +1,271 @@
+---
+title: "Mass Shooting Gun Violence in the United States of America"
+subtitle: "Time Series Models"
+author: "Trevor Schrotz"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    theme: lumen
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
+editor_options:
+  chunk_output_type: inline
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+# Introduction
+
+## Preface
+
+This is part two in a look at gun violence mass shootings in the US.  In this analysis, we will look at the shooting incident data geographically.
+
+# Setup
+
+## Load Libraries
+
+```{r, include=TRUE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(tidytext)
+library(lubridate)
+library(scales)
+library(janitor)
+library(tidymodels)
+library(modeltime)
+library(tictoc)
+library(future)
+library(doFuture)
+library(tidyquant)
+library(timetk)
+library(thief)
+
+registerDoFuture()
+
+n_cores <- parallel::detectCores()
+
+plan(strategy = cluster,
+     workers  = parallel::makeCluster(n_cores))
+```
+
+# Source the data
+
+Read in the saved data file.
+
+```{r, include=TRUE}
+complete_tbl <- read_rds("gva_data.rds") 
+```
+
+Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
+
+```{r cleaning, include=TRUE}
+ms_tbl <- complete_tbl %>% 
+    janitor::clean_names() %>% 
+    select(-operations) %>% 
+    mutate(incident_date = mdy(incident_date),
+           year = year(incident_date),
+           month = month(incident_date, label = T, abbr = T),
+           incident_month = rollforward(incident_date),
+           dow = wday(incident_date, label = TRUE)) %>% 
+    arrange(incident_date)
+```
+
+Time Series Predictions
+```{r}
+
+```
+
+Nesting the time series data
+```{r}
+future_date <- 12
+
+ms_model_data <- ms_tbl %>%
+    filter(incident_date < floor_date(Sys.Date(), "month"),
+           year(incident_date) >= 2020) %>%
+    group_function(incident_month) %>%
+    select(-n_injuries, -n_deaths) %>%
+    mutate(state = "us")
+    #group_by(state) %>%
+    #filter(n() > 10) %>%
+    #ungroup()
+
+ms_model_state_data <- ms_tbl %>%
+    filter(incident_date < floor_date(Sys.Date(), "month"),
+           year(incident_date) >= 2020) %>%
+    group_function(state, incident_month) %>%
+    select(-n_injuries, -n_deaths) %>%
+    complete(state, incident_month, fill = list(n_incidents = 0)) %>%
+    filter(state %in% top_five_states)
+
+nested_data_tbl <- ms_model_state_data %>% #ms_model_data %>%
+    group_by(state) %>%
+    modeltime::extend_timeseries(.id_var = state,
+                                 .date_var = incident_month,
+                                 .length_future = future_date) %>%
+    modeltime::nest_timeseries(.id_var = state,
+                    .length_future = future_date) %>%
+    modeltime::split_nested_timeseries(.length_test = future_date)
+```
+
+Models
+```{r}
+# # MODELING ----
+# # * XGBoost Recipe ----
+rec_xgb <- recipe(n_incidents ~ ., extract_nested_train_split(nested_data_tbl)) %>%
+    step_timeseries_signature(incident_month) %>%
+    step_rm(incident_month) %>%
+    step_zv(all_predictors()) %>%
+    step_dummy(all_nominal_predictors(), one_hot = TRUE)
+
+rec_arima <- recipe(n_incidents ~ ., extract_nested_train_split(nested_data_tbl)) %>%
+    step_timeseries_signature(incident_month) %>%
+    step_zv(all_predictors()) %>%
+    step_dummy(all_nominal_predictors(), one_hot = TRUE)
+
+# * XGBoost Models ----
+
+wflw_xgb_1 <- workflow() %>%
+    add_model(boost_tree("regression", learn_rate = 0.35) %>% set_engine("xgboost")) %>%
+    add_recipe(rec_xgb)
+
+wflw_xgb_2 <- workflow() %>%
+    add_model(boost_tree("regression", learn_rate = 0.50) %>% set_engine("xgboost")) %>%
+    add_recipe(rec_xgb)
+
+# * RandForest Model ----
+wflw_rf_1 <- workflow() %>%
+    add_model(rand_forest("regression") %>% set_engine("ranger")) %>%
+    add_recipe(rec_xgb)
+
+# * ARIMA Boost
+wflw_arima_1 <- workflow() %>%
+    add_model(arima_boost("regression") %>% set_engine("arima_xgboost")) %>%
+    add_recipe(rec_arima)
+
+# *  Prophet Boost
+wflw_prophet_1 <- workflow() %>%
+    add_model(prophet_boost("regression") %>% set_engine("prophet_xgboost")) %>%
+    add_recipe(rec_arima)
+```
+
+Test run and error checking
+```{r}
+# # 1.0 TRY 1 TIME SERIES ----
+# #   - Tells us if our models work at least once (before we scale)
+try_sample_tbl <- nested_data_tbl %>%
+    slice(1) %>%
+    modeltime_nested_fit(
+        model_list = list(
+            wflw_xgb_1,
+            wflw_xgb_2,
+            wflw_rf_1,
+            wflw_arima_1,
+            #wflw_ets_1,
+            wflw_prophet_1),
+        control = control_nested_fit(
+            verbose   = TRUE,
+            allow_par = FALSE))
+
+try_sample_tbl
+
+# * Check Errors ----
+try_sample_tbl %>% extract_nested_error_report()
+```
+
+Scale up and process models
+```{r}
+# # 2.0 SCALE ----
+parallel_start(16)
+
+nested_modeltime_tbl <- nested_data_tbl %>%
+    modeltime_nested_fit(
+        model_list = list(
+            wflw_xgb_1,
+            wflw_xgb_2,
+            wflw_rf_1,
+            wflw_arima_1,
+            #wflw_ets_1,
+            wflw_prophet_1),
+        control = control_nested_fit(
+            verbose   = TRUE,
+            allow_par = TRUE))
+```
+
+Error review
+```{r}
+# # * Review Any Errors ----
+nested_modeltime_tbl %>% extract_nested_error_report()
+```
+
+Accuracy review
+```{r}
+# # * Review Test Accuracy ----
+nested_modeltime_tbl %>%
+    extract_nested_test_accuracy() %>%
+    table_modeltime_accuracy()
+```
+
+Test Forecast against actuals
+```{r}
+# # * Visualize Test Forecast ----
+nested_modeltime_tbl %>%
+    extract_nested_test_forecast() %>%
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
+```
+
+Select best models
+```{r}
+# # 3.0 SELECT BEST ----
+nested_best_tbl <- nested_modeltime_tbl %>%
+    modeltime_nested_select_best(metric = "mae", minimize = TRUE)
+```
+
+Visualize best models
+```{r}
+# # * Visualize Best Models ----
+nested_best_tbl %>%
+    extract_nested_test_forecast() %>%
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
+```
+
+Model refits
+```{r}
+# # 4.0 REFIT ----
+nested_best_refit_tbl <- nested_best_tbl %>%
+    modeltime_nested_refit(
+        control = control_refit(
+            verbose   = TRUE,
+            allow_par = TRUE))
+
+parallel_stop()
+```
+
+Final error review
+```{r}
+# # * Review Any Errors ----
+nested_best_refit_tbl %>% extract_nested_error_report()
+```
+
+Visualize future forecast
+```{r}
+# # * Visualize Future Forecast ----
+nested_best_refit_tbl %>%
+    extract_nested_future_forecast() %>%
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
+```
+
+
+
+
