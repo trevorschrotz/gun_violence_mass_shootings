@@ -60,7 +60,7 @@ library(knitr)
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
 
-## Source Data from the Gun Violence Archive
+## Source Data from the GVA
 
 To get the prolific amount of data from the GVA website, we can employe web scraping to read the html and turn it into a tidy tabular format for analysis.
 
@@ -630,7 +630,7 @@ The five states with the greatest number of mass shootings are: `r knitr::combin
 
 We should consider proportionally how likely it is to encounter a mass shooting (or being injured or killed) instead of just looking at the total because each state has widely differing total populations.  In other words, given the population of a state, which states have the greatest number of mass shootings (or deaths or injuries) per person?  I will use the 2020 US decennial census population data by state and the number of incidents, injuries, and deaths by state in 2021.  I am including Washington, D.C. as a state.  N.B. Another way to approach this would be to sum all of the years compared to a 2020 population, but I elected to simply choose the most recent complete year on record.
 
-## Most Violent States Per Capita
+## Top Mass Shootings States Per Capita
 
 Which ten states have the most mass shootings, deaths, or injuries per capita? 
 
