@@ -7,7 +7,7 @@ output:
   html_document:
     theme: lumen
     df_print: paged
-    code_folding: hide
+    code_folding: show
     toc: true
     toc_depth: 4
     toc_float: true
@@ -17,7 +17,7 @@ editor_options:
 
 <style type="text/css">
 .main-container {
-  max-width: 1400px;
+  max-width: 1600px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -167,7 +167,7 @@ write_rds(complete_tbl, "gva_data.rds")
 Read in the saved data file.
 
 ```{r, include=TRUE}
-complete_tbl <- read_rds("gva_data.rds") 
+complete_tbl <- read_rds("gva_data.rds")
 ```
 
 Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
@@ -237,7 +237,7 @@ injuries <- ms_tbl %>%
 
 * Since 2014, there have been `r comma(mass_shootings)` mass shootings, `r comma(deaths)` people have died, and there have been `r comma(injuries)` injuries.
 * There is about one death per mass shooting on average.  
-* There are about four injuries per mass shooting event.
+* There are about four injuries per mass shooting event on average.
 * There are four times more injuries than deaths (4:1 per incident on average).  
 
 ```{r initial totals, include=TRUE}
@@ -312,7 +312,7 @@ gr_table %>%
     theme_tq() +
     scale_color_tq() +
     facet_grid(~fct_inorder(name)) +
-    labs(title = "Change in Volume of Mass Shootings, Deaths, and Injuries by Year",
+    labs(title = "Percentage Change in Volume of Mass Shootings, Deaths, and Injuries by Year",
          x = "",
          y = "% Change From Prior Year",
          caption = "current incomplete year removed") +
@@ -442,7 +442,7 @@ chi_tbl %>%
 chisq_test(x = chi_tbl, formula = dow ~ month)
 ```
 
-The answer is that we don't have enough evidence to support the hypothesis that there is a significant relationship between the mass shooting day of the week and the month in which is occurs.  The Sundays in Jun, Jul, and Aug stand out with higher volumes, but there isn't a statistically significant difference in those months and days of the week.
+The answer is that we don't have enough evidence to support the hypothesis that there is a significant relationship between the mass shooting day of the week and the month in which is occurs.  The Sundays in Jun, Jul, and Aug stand out with higher volumes, but there isn't a statistically significant difference in those months and days of the week at the p < 0.05 significance level.
 
 Follow up question.  What proportion of shootings happen in the different sesaons (roughly approximated by season starting month)?
 
@@ -543,7 +543,7 @@ Additionally, we can also see that since 2020, the variability in the number of 
 
 ## Incidents, Deaths, and Injuries by Month
 
-This is a time series that takes incidents as we have seen previously and lays out deaths and injury volume over time.
+This is a time series that takes incidents as we have seen previously and lays out deaths and injury volume by month.
 
 ```{r death vs injury, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
 ms_tbl %>% 
@@ -624,6 +624,12 @@ top_five_states <- state_stats %>%
     filter(incidents_rank %in% c(1:5)) %>% 
     arrange(incidents_rank) %>% 
     pull(state)
+
+top_nine_states <- state_stats %>% 
+    filter(incidents_rank %in% c(1:9)) %>% 
+    arrange(incidents_rank)
+
+write_csv(top_nine_states, "top_nine_states.csv")
 ```
 
 The five states with the greatest number of mass shootings are: `r knitr::combine_words(top_five_states)`.
@@ -695,6 +701,31 @@ test$status_code
 test$content
 
 test %>% xml2::read_html() %>% rvest::html_table()
+
+
+# https://callumgwtaylor.github.io/post/using-rselenium-and-docker-to-webscrape-in-r-using-the-who-snake-database/
+# https://www.youtube.com/watch?v=Dkm1d4uMp34
+library(RSelenium)
+library(netstat)
+# docker run -d -p 4445:4444 selenium/standalone-chrome
+# docker ps
+# open chrome, type chrome://version/ and find the version
+# next use binman below to find closest / latest version based upon first digits
+binman::list_versions("chromedriver")
+
+rs_driver_object <- rsDriver(browser = "chrome", 
+                             chromever = "105.0.5195.19", 
+                             verbose = FALSE, 
+                             port = free_port(), 
+                             extraCapabilities = list("--disable-blink-features=AutomationControlled"))
+
+remDr <- rs_driver_object$client
+
+# remDr$open() # opens a chrome browser / keep it open
+
+remDr$navigate(url = "https://www.gunviolencearchive.org/incident/225830")
+
+remDr$refresh()
 ```
 
 # Summary
@@ -711,6 +742,4 @@ Only two of fifty states in the past eight years have not had a mass shooting - 
 
 The top five states (including Washington, DC) with the most total mass shootings since 2014 are `r knitr::combine_words(top_five_states)`.
 
-Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C., in fact, you are three times more likely than the next closest state which is Delaware in 2021.  D.C. is extraordinarily higher, not in total volume, but in the number of mass shootings per person in the D.C. population.  Illinois, which is highest in total volume, also makes the list for states with the highest mass shootings, injuries, and deaths per capita.  The other top volume states, California, Texas, Florida, and Pennsylvania do not share that distinction.
-
-
+Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C., in fact, you are three times more likely than the next closest state which is Delaware in 2021.  D.C. is extraordinarily higher, not in total volume, but in the number of mass shootings per person in the D.C. population.  Illinois, which is highest in total volume, also makes the list for states with the highest mass shootings, injuries, and deaths per capita.  The other top volume states, California, Texas, Florida, and Pennsylvania do not share that distinction in 2021.

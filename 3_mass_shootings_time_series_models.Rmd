@@ -63,6 +63,8 @@ Read in the saved data file.
 
 ```{r, include=TRUE}
 complete_tbl <- read_rds("gva_data.rds") 
+top_nine_states <- read_csv("top_nine_states.csv") %>% 
+    pull(state)
 ```
 
 Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
@@ -79,24 +81,35 @@ ms_tbl <- complete_tbl %>%
     arrange(incident_date)
 ```
 
-Time Series Predictions
-```{r}
+Here I create a function to group and summarize the data in different ways since we will need to do this many times later.
 
+```{r grouping function, include=TRUE}
+group_function <- function(df, ...) {
+    
+    output <- df %>% 
+        group_by(...) %>% 
+        summarize(n_incidents = n(),
+                  n_deaths = sum(number_killed, na.rm = T),
+                  n_injuries = sum(number_injured, na.rm = T),
+                  .groups = "drop")
+    
+    return(output)
+}
 ```
 
 Nesting the time series data
 ```{r}
 future_date <- 12
 
-ms_model_data <- ms_tbl %>%
-    filter(incident_date < floor_date(Sys.Date(), "month"),
-           year(incident_date) >= 2020) %>%
-    group_function(incident_month) %>%
-    select(-n_injuries, -n_deaths) %>%
-    mutate(state = "us")
-    #group_by(state) %>%
-    #filter(n() > 10) %>%
-    #ungroup()
+# ms_model_data <- ms_tbl %>%
+#     filter(incident_date < floor_date(Sys.Date(), "month"),
+#            year(incident_date) >= 2020) %>%
+#     group_function(incident_month) %>%
+#     select(-n_injuries, -n_deaths) %>%
+#     mutate(state = "us")
+#     #group_by(state) %>%
+#     #filter(n() > 10) %>%
+#     #ungroup()
 
 ms_model_state_data <- ms_tbl %>%
     filter(incident_date < floor_date(Sys.Date(), "month"),
@@ -104,7 +117,7 @@ ms_model_state_data <- ms_tbl %>%
     group_function(state, incident_month) %>%
     select(-n_injuries, -n_deaths) %>%
     complete(state, incident_month, fill = list(n_incidents = 0)) %>%
-    filter(state %in% top_five_states)
+    filter(state %in% top_nine_states)
 
 nested_data_tbl <- ms_model_state_data %>% #ms_model_data %>%
     group_by(state) %>%
