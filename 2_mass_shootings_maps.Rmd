@@ -150,3 +150,86 @@ ms_lat_longs %>%
     addProviderTiles("Esri", group = "Esri") %>%
     addLayersControl(baseGroups = c("Esri","CartoDB")) # Use addLayersControl to allow users to toggle between basemaps
 ```
+
+```{r future scrape, include=FALSE, eval=FALSE}
+#Scraping Incident Details - come back to this later - getting a 503 error...
+incident_ids <- ms_tbl %>%
+    distinct(incident_id)
+
+geo_locations_incidents_tbl <- incident_ids %>%
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
+
+geo_scrape <- geo_locations_incidents_tbl %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+geo_locations_tbl <- map_df(geo_scrape$scrape, ~ html_table(.x))
+
+url <- "https://www.gunviolencearchive.org/incident/465117"
+
+test <- httr::GET(url) %>% `$`("content")
+
+test$status_code
+
+test$content
+
+test %>% xml2::read_html() %>% rvest::html_table()
+
+
+# https://callumgwtaylor.github.io/post/using-rselenium-and-docker-to-webscrape-in-r-using-the-who-snake-database/
+# https://www.youtube.com/watch?v=Dkm1d4uMp34
+library(RSelenium)
+library(netstat)
+# docker run -d -p 4445:4444 selenium/standalone-chrome
+# docker ps
+# open chrome, type chrome://version/ and find the version
+# next use binman below to find closest / latest version based upon first digits
+
+url <- "https://www.gunviolencearchive.org/incident/465117"
+exCap <- list("moz::firefoxOptions" = list(args = list('--headless')))
+rD <- rsDriver(browser = "firefox", 
+               extraCapabilities = exCap, 
+               port = 1111L, 
+               verbose = FALSE)
+
+remDr <- rD$client
+
+remDr$open()
+
+remDr$navigate(url)
+
+
+remDr <- remoteDriver(browser = "sharp_wright", port = 4445L)
+
+remDr$open()
+remDr$navigate("https://www.gunviolencearchive.org/incident/225830")
+
+# Using Docker
+remDr <- remoteDriver(port = 4445L)
+
+remDr$open()
+remDr$errorDetails()
+
+remDr$navigate("https://www.gunviolencearchive.org/incident/225830")
+
+# Using RSelenium Directly
+binman::list_versions("chromedriver")
+
+eCaps <- list(chromeOptions = list(args = list("--headless","--disable-infobars",
+                                               "--excludeSwitches","--useAutomationExtension = FALSE",
+                                               "--enable-automation"))) #
+
+rs_driver_object <- rsDriver(browser = "chrome", 
+                             chromever = "105.0.5195.52", 
+                             verbose = FALSE, 
+                             port = netstat::free_port(), 
+                             extraCapabilities = eCaps)
+
+remDr <- rs_driver_object$client
+
+asdf <- remDr$navigate(url = url)
+
+remDr$screenshot(file = asdf, display = TRUE)
+    
+
+# https://github.com/trevorschrotz/gun_violence_mass_shootings.git
+```
