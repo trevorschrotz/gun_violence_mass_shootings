@@ -49,6 +49,7 @@ library(tidycensus)
 library(tidygeocoder)
 library(leaflet)
 library(reticulate)
+pd <- py_install("pandas")
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
 
@@ -74,15 +75,28 @@ ms_tbl <- complete_tbl %>%
     arrange(incident_date)
 ```
 
+# Pull the incident IDs from the GVA data which then become part of the URL for the incident-specific information.
+
+```{r}
+incident_ids <- ms_tbl %>%
+    distinct(incident_id)
+
+geo_locations_incidents_tbl <- incident_ids %>%
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
+```
+
+
 ```{python}
 
 # run these in terminal
 # pip install selenium
 # pip install chromedriver
+# pip install beautifulsoup4
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-
+from bs4 import BeautifulSoup
+import pandas as pd
 
 options = Options()
 options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -92,10 +106,19 @@ options.add_argument("--user-data-dir=C:/Users/trevorschrotz/AppData/Local/Googl
 options.add_experimental_option("useAutomationExtension", False)
 
 driver = webdriver.Chrome(options=options)
-first_page = "https://www.gunviolencearchive.org/incident/2438535"
-driver.get(first_page)
+first_page = "https://www.gunviolencearchive.org/reports/mass-shooting?year=2019"
+driver.get(first_page) 
+soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+pd.read_html(BeautifulSoup(driver.page_source, 'html.parser'))
+
+soup.select(selector="Location")
+soup.select_one('h2:-soup-contains("Location")').find_next('table')
+soup.find('h2',text='Location').text
+
 
 ```
+
 
 
 # Mapping
