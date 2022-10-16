@@ -48,6 +48,7 @@ library(rvest)
 library(tidycensus)
 library(tidygeocoder)
 library(leaflet)
+library(reticulate)
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
 
@@ -73,9 +74,33 @@ ms_tbl <- complete_tbl %>%
     arrange(incident_date)
 ```
 
+```{python}
+
+# run these in terminal
+# pip install selenium
+# pip install chromedriver
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+
+options = Options()
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_argument("--profile-directory=Default")
+options.add_argument("--user-data-dir=C:/Users/trevorschrotz/AppData/Local/Google/Chrome/User Data")
+options.add_experimental_option("useAutomationExtension", False)
+
+driver = webdriver.Chrome(options=options)
+first_page = "https://www.gunviolencearchive.org/incident/2438535"
+driver.get(first_page)
+
+```
+
+
 # Mapping
 
-```{r get geoloc, include=TRUE, eval=FALSE}
+```{r get geoloc, eval=FALSE}
 # Incident Map
 # get a list of unique cities and states;
 # this reduces our list down to ~1090 vs ~3840, which will take about 18 minutes to geocode vs 50 minutes
