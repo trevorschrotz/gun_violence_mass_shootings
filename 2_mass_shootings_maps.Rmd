@@ -79,11 +79,15 @@ ms_tbl <- complete_tbl %>%
 
 ```{r}
 incident_ids <- ms_tbl %>%
-    distinct(incident_id)
+    distinct(incident_id) # get a list of all of the incident IDs
 
 geo_locations_incidents_tbl <- incident_ids %>%
-    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}")) # create a tibble with all of the URLs needed
 ```
+
+The initial reason I started this project was to work on a web scraping endeavor.  What I began with was part one of this project, and scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  However, as things progressed and I wanted to mine more of the incident data, I discovered that the GVA website has a robot algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  Eventually, I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been needing to enhance my Python skills, and this was a practical avenue to move forward with that objecive.
+
+The following took a few weeks of research and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did quesiton pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best lat lon information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing information.  GVA seems to have better data on the coordinates behind the scenes.
 
 
 ```{python}
@@ -95,33 +99,102 @@ geo_locations_incidents_tbl <- incident_ids %>%
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
+from time import sleep
 import pandas as pd
 
-options = Options()
+options = Options() # these are the options needed to hide that the browser was being controlled by a computer and not a human
 options.add_experimental_option("excludeSwitches", ["enable-automation"])
 options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument("--profile-directory=Default")
-options.add_argument("--user-data-dir=C:/Users/trevorschrotz/AppData/Local/Google/Chrome/User Data")
 options.add_experimental_option("useAutomationExtension", False)
 
-driver = webdriver.Chrome(options=options)
-first_page = "https://www.gunviolencearchive.org/reports/mass-shooting?year=2019"
-driver.get(first_page) 
-soup = BeautifulSoup(driver.page_source, 'html.parser')
+driver = webdriver.Chrome(options=options) # this established the browser
+first_page = "https://www.gunviolencearchive.org/incident/882422" # this is a default page to start with
+driver.get(first_page) # this opens the URL in the established browser
 
-pd.read_html(BeautifulSoup(driver.page_source, 'html.parser'))
+# from here, I had to click on a second tab manually, and open another page on the same website which cleared the bot limiter I was running into
 
-soup.select(selector="Location")
-soup.select_one('h2:-soup-contains("Location")').find_next('table')
-soup.find('h2',text='Location').text
+# then, I was able to run the loop as follows
 
+url_list = r.geo_locations_incidents_tbl # creates a dataframe in python from the R dataframe created earlier
+temp_list = {
+    "geo_data": []
+} # this is an empty list container that will hold the HTML text as we iterate over the pages.
+
+for url in url_list["pages"]: # loop to open the pages, parse the HTML, parse, the text from the page, pop it into a list, rinse, and repeat
+    driver.get(url)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    geo_loc = soup.get_text()
+    temp_list["geo_data"].append(geo_loc)
+    
+df = pd.DataFrame.from_dict(temp_list) # this moves the list into a dataframe
+
+driver.close() # this closes the session.
+
+# note that I was not able to iterate of 4000 pages as the bot detector blocked my IPs from my VPN a few times
+# I broke the chunks down into 200 to 300 at a time, and that seemed to do the trick
+# I probably could have used a sleep command to slow the roll, which might have appeased the bot police....
 
 ```
 
+```{r}
+geo_data <- py$df # this command moves a Python object into an R object...Reticulate is pretty sweet!
 
+write_rds(geo_data, "scrapped_geo_data.rds") # I stored the data as I went in case R crashed
+```
+
+
+```{r, include=TRUE, eval=FALSE}
+geo_data <- read_rds("scrapped_geo_data.rds")
+
+output <- geo_data %>% 
+    transmute(test = str_extract(geo_data, "Geolocation.*")) # pull the geo location data
+
+ms_tbl_updated <- ms_tbl %>% 
+    bind_cols(output) # combine the original data with the new geo location data
+
+tbl_to_update <- read_rds("ms_tbl_updated_geo_locs.rds") # use this to source a previously stored table and append it
+
+ms_tbl_updated <- tbl_to_update %>% 
+    bind_rows(ms_tbl_updated) # append the new data rows to the old
+
+write_rds(ms_tbl_updated, "ms_tbl_updated_geo_locs.rds") # save it
+
+ms_tbl_updated %>% 
+    summarize(n = n(),
+              n_dist = n_distinct(incident_id)) # check it
+```
 
 # Mapping
+
+```{r map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+ms_tbl_map_data <- read_rds("ms_tbl_updated_geo_locs.rds")
+
+ms_tbl_map_prep <- ms_tbl_map_data %>% 
+    rename("GeoLocation" = test) %>% 
+    mutate(temp = GeoLocation,
+           temp = str_remove_all(temp, "Geolocation: ")) %>% 
+    separate(temp, into = c("latitude","longitude"), sep = ", ") %>% 
+    mutate(across(latitude:longitude, ~ as.numeric(.)))
+
+# List the available map tiles
+#names(providers)
+
+# Create a leaflet map with default map tile using addTiles()
+ms_tbl_map_prep %>% 
+    leaflet() %>%
+    addProviderTiles("CartoDB") %>%
+    addCircleMarkers(lng = longitude, lat = latitude,
+                     label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
+                                    htmltools::HTML), radius = 3, color = "steelblue", clusterOptions = markerClusterOptions()) %>%
+    addProviderTiles("CartoDB", group = "CartoDB") %>%
+    addProviderTiles("Esri", group = "Esri") %>%
+    addLayersControl(baseGroups = c("Esri","CartoDB")) # Use addLayersControl to allow users to toggle between basemaps
+```
+
+
 
 ```{r get geoloc, eval=FALSE}
 # Incident Map
@@ -163,10 +236,10 @@ ms_lat_longs <- read_rds("ms_lat_longs.rds")
 ```{r simple map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
 library(gganimate)
 
-ms_lat_longs %>% 
+ms_tbl_map_prep %>% 
     mutate(year = factor(year)) %>% 
     filter(state != "Alaska") %>% 
-    ggplot(aes(jitter(longitude, 0.005), jitter(latitude, 0.005), 
+    ggplot(aes(longitude, latitude, 
                size = number_killed + number_injured,
                color = year)) +
     geom_point() +
@@ -184,100 +257,3 @@ ms_lat_longs %>%
     exit_fade()
 ```
 
-```{r map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
-# List the available map tiles
-#names(providers)
-
-# Create a leaflet map with default map tile using addTiles()
-ms_lat_longs %>%
-    leaflet() %>%
-    addProviderTiles("CartoDB") %>%
-    addCircleMarkers(lng = ~jitter(longitude, amount = 0.05), lat = ~jitter(latitude, amount = 0.05),
-                     label = lapply(str_glue("{month(ms_lat_longs$incident_date, label = TRUE, abbr = TRUE)} {year(ms_lat_longs$incident_date)} <br/> {ms_lat_longs$city_or_county}, {ms_lat_longs$state} <br/> {ms_lat_longs$number_killed} killed | {ms_lat_longs$number_injured} wounded"), htmltools::HTML), radius = 3, color = "steelblue", clusterOptions = markerClusterOptions()) %>%
-    addProviderTiles("CartoDB", group = "CartoDB") %>%
-    addProviderTiles("Esri", group = "Esri") %>%
-    addLayersControl(baseGroups = c("Esri","CartoDB")) # Use addLayersControl to allow users to toggle between basemaps
-```
-
-```{r future scrape, include=FALSE, eval=FALSE}
-#Scraping Incident Details - come back to this later - getting a 503 error...
-incident_ids <- ms_tbl %>%
-    distinct(incident_id)
-
-geo_locations_incidents_tbl <- incident_ids %>%
-    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
-
-geo_scrape <- geo_locations_incidents_tbl %>%
-    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
-
-geo_locations_tbl <- map_df(geo_scrape$scrape, ~ html_table(.x))
-
-url <- "https://www.gunviolencearchive.org/incident/465117"
-
-test <- httr::GET(url) %>% `$`("content")
-
-test$status_code
-
-test$content
-
-test %>% xml2::read_html() %>% rvest::html_table()
-
-
-# https://callumgwtaylor.github.io/post/using-rselenium-and-docker-to-webscrape-in-r-using-the-who-snake-database/
-# https://www.youtube.com/watch?v=Dkm1d4uMp34
-library(RSelenium)
-library(netstat)
-# docker run -d -p 4445:4444 selenium/standalone-chrome
-# docker ps
-# open chrome, type chrome://version/ and find the version
-# next use binman below to find closest / latest version based upon first digits
-
-url <- "https://www.gunviolencearchive.org/incident/465117"
-exCap <- list("moz::firefoxOptions" = list(args = list('--headless')))
-rD <- rsDriver(browser = "firefox", 
-               extraCapabilities = exCap, 
-               port = 1111L, 
-               verbose = FALSE)
-
-remDr <- rD$client
-
-remDr$open()
-
-remDr$navigate(url)
-
-
-remDr <- remoteDriver(browser = "sharp_wright", port = 4445L)
-
-remDr$open()
-remDr$navigate("https://www.gunviolencearchive.org/incident/225830")
-
-# Using Docker
-remDr <- remoteDriver(port = 4445L)
-
-remDr$open()
-remDr$errorDetails()
-
-remDr$navigate("https://www.gunviolencearchive.org/incident/225830")
-
-# Using RSelenium Directly
-binman::list_versions("chromedriver")
-
-eCaps <- list(chromeOptions = list(args = list("--headless","--disable-infobars",
-                                               "--excludeSwitches","--useAutomationExtension = FALSE",
-                                               "--enable-automation"))) #
-
-rs_driver_object <- rsDriver(browser = "chrome", 
-                             chromever = "105.0.5195.52", 
-                             verbose = FALSE, 
-                             port = netstat::free_port(), 
-                             extraCapabilities = eCaps)
-
-remDr <- rs_driver_object$client
-
-asdf <- remDr$navigate(url = url)
-
-remDr$screenshot(file = asdf, display = TRUE)
-    
-
-# https://github.com/trevorschrotz/gun_violence_mass_shootings.git
-```
