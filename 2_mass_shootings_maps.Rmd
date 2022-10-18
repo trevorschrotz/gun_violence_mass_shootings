@@ -25,6 +25,10 @@ editor_options:
 
 # Introduction
 
+The initial reason I started this project was to work on a web scraping endeavor.  What I began with was part one of this project, and scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  However, as things progressed and I wanted to mine more of the incident data, I discovered that the GVA website has a robot algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  Eventually, I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been needing to enhance my Python skills, and this was a practical avenue to move forward with that objecive.
+
+The following took a few weeks of research and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did quesiton pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best lat lon information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing information.  GVA seems to have better data on the coordinates behind the scenes.
+
 ## Preface
 
 This is part two in a look at gun violence mass shootings in the US.  In this analysis, we will look at the shooting incident data geographically.
@@ -44,13 +48,11 @@ library(skimr)
 library(tidyquant)
 library(broom)
 library(purrr)
-library(rvest)
 library(tidycensus)
-library(tidygeocoder)
 library(leaflet)
 library(reticulate)
-pd <- py_install("pandas")
 api_key <- Sys.getenv("CENSUS_API_KEY")
+knitr::opts_chunk$set(python.reticulate = FALSE)
 ```
 
 # Source the data
@@ -75,9 +77,9 @@ ms_tbl <- complete_tbl %>%
     arrange(incident_date)
 ```
 
-# Pull the incident IDs from the GVA data which then become part of the URL for the incident-specific information.
+Pull the incident IDs from the GVA data which then become part of the URL for the incident-specific information.  This was from the original pull for all incidents, but after gathering the historicals, I only need to update with new incidents.
 
-```{r}
+```{r, include=TRUE, eval=FALSE}
 incident_ids <- ms_tbl %>%
     distinct(incident_id) # get a list of all of the incident IDs
 
@@ -85,10 +87,22 @@ geo_locations_incidents_tbl <- incident_ids %>%
     mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}")) # create a tibble with all of the URLs needed
 ```
 
-The initial reason I started this project was to work on a web scraping endeavor.  What I began with was part one of this project, and scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  However, as things progressed and I wanted to mine more of the incident data, I discovered that the GVA website has a robot algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  Eventually, I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been needing to enhance my Python skills, and this was a practical avenue to move forward with that objecive.
+Here we only need to evaluate on the new incidents and then look up those geolocations.
 
-The following took a few weeks of research and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did quesiton pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best lat lon information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing information.  GVA seems to have better data on the coordinates behind the scenes.
+```{r, include=TRUE, eval=FALSE}
+ms_tbl_updated_geo_locs <- read_rds("ms_tbl_updated_geo_locs.rds")
 
+new_incident_ids <- ms_tbl %>% 
+    anti_join(ms_tbl_updated_geo_locs, by = "incident_id") %>% 
+    distinct(incident_id)
+
+new_geo_locations_incidents_tbl <- new_incident_ids %>%
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}")) # create a tibble with all of the URLs needed
+```
+
+# Webscraping with Python
+
+Now we can scrape using Python which gives us a lot more flexibility than RSelenium does (or at least that I could figure out).
 
 ```{python}
 
@@ -118,7 +132,7 @@ driver.get(first_page) # this opens the URL in the established browser
 
 # then, I was able to run the loop as follows
 
-url_list = r.geo_locations_incidents_tbl # creates a dataframe in python from the R dataframe created earlier
+url_list = r.new_geo_locations_incidents_tbl # creates a dataframe in python from the R dataframe created earlier
 temp_list = {
     "geo_data": []
 } # this is an empty list container that will hold the HTML text as we iterate over the pages.
@@ -139,12 +153,15 @@ driver.close() # this closes the session.
 
 ```
 
+Pull the Python object into R, and back up the scraped data in case of R crash.
+
 ```{r}
 geo_data <- py$df # this command moves a Python object into an R object...Reticulate is pretty sweet!
 
 write_rds(geo_data, "scrapped_geo_data.rds") # I stored the data as I went in case R crashed
 ```
 
+Update the geo locations file with the new records and save it.
 
 ```{r, include=TRUE, eval=FALSE}
 geo_data <- read_rds("scrapped_geo_data.rds")
@@ -153,7 +170,8 @@ output <- geo_data %>%
     transmute(test = str_extract(geo_data, "Geolocation.*")) # pull the geo location data
 
 ms_tbl_updated <- ms_tbl %>% 
-    bind_cols(output) # combine the original data with the new geo location data
+    anti_join(ms_tbl_updated_geo_locs, by = "incident_id") %>% 
+    bind_cols(output) # combine the original data with the new geo location data 
 
 tbl_to_update <- read_rds("ms_tbl_updated_geo_locs.rds") # use this to source a previously stored table and append it
 
@@ -167,7 +185,7 @@ ms_tbl_updated %>%
               n_dist = n_distinct(incident_id)) # check it
 ```
 
-# Mapping
+# Mapping Incidents with leaflet
 
 ```{r map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 ms_tbl_map_data <- read_rds("ms_tbl_updated_geo_locs.rds")
@@ -185,55 +203,17 @@ ms_tbl_map_prep <- ms_tbl_map_data %>%
 # Create a leaflet map with default map tile using addTiles()
 ms_tbl_map_prep %>% 
     leaflet() %>%
-    addProviderTiles("CartoDB") %>%
-    addCircleMarkers(lng = longitude, lat = latitude,
-                     label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
-                                    htmltools::HTML), radius = 3, color = "steelblue", clusterOptions = markerClusterOptions()) %>%
+    addProviderTiles("CartoDB") %>% 
+    addCircleMarkers(label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
+                                    htmltools::HTML), radius = 3, color = "black", clusterOptions = markerClusterOptions()) %>%
     addProviderTiles("CartoDB", group = "CartoDB") %>%
     addProviderTiles("Esri", group = "Esri") %>%
     addLayersControl(baseGroups = c("Esri","CartoDB")) # Use addLayersControl to allow users to toggle between basemaps
 ```
 
+# Mapping Incidents Over Time with gganimate
 
-
-```{r get geoloc, eval=FALSE}
-# Incident Map
-# get a list of unique cities and states;
-# this reduces our list down to ~1090 vs ~3840, which will take about 18 minutes to geocode vs 50 minutes
-
-unique_city_state <- ms_tbl %>%
-    mutate(city_or_county = str_remove_all(city_or_county, "\\(.*\\)")) %>%
-    distinct(city_or_county, state)
-
-ms_lat_longs_nest <- unique_city_state %>%
-    mutate(group_state = state) %>%
-    group_by(group_state) %>%
-    nest(data = -group_state) %>%
-    mutate(mapper = map(.x = data, .f = function(data) { data %>%
-                                                             geocode(city = city_or_county,
-                                                         state = state,
-                                                         method = 'osm',
-                                                         lat = latitude ,
-                                                         long = longitude) }))
-
-ms_lat_longs <- ms_lat_longs_nest %>%
-    unnest(mapper) %>%
-    ungroup() %>%
-    select(-group_state, -data) %>%
-    inner_join(ms_tbl %>%
-                   mutate(city_or_county = str_remove_all(city_or_county, "\\(.*\\)")),
-               by = c("city_or_county","state"))
-
-#save it so we don't have to re-run this every session
-
-write_rds(x = ms_lat_longs, "ms_lat_longs.rds")
-```
-
-```{r load map data, include=TRUE, eval=TRUE}
-ms_lat_longs <- read_rds("ms_lat_longs.rds")
-```
-
-```{r simple map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
+```{r animated map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
 library(gganimate)
 
 ms_tbl_map_prep %>% 
@@ -252,8 +232,14 @@ ms_tbl_map_prep %>%
          x = "",
          y = "") +
     theme(legend.position = "none") +
-    transition_states(year, transition_length = 1, state_length = 1) +
-    enter_fade() +
-    exit_fade()
+    transition_states(year, transition_length = 1, state_length = 1, ) +
+    enter_fade()
 ```
+
+Mappings with census data?
+
+```{r}
+
+```
+
 
