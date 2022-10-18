@@ -1,13 +1,13 @@
 ---
 title: "Mass Shooting Gun Violence in the United States of America"
-subtitle: "Maps and Geographic Analysis"
+subtitle: "Part II: Maps and Geographic Analysis"
 author: "Trevor Schrotz"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
   html_document:
     theme: lumen
     df_print: paged
-    code_folding: hide
+    code_folding: show
     toc: true
     toc_depth: 4
     toc_float: true
@@ -17,7 +17,7 @@ editor_options:
 
 <style type="text/css">
 .main-container {
-  max-width: 1400px;
+  max-width: 1600px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -25,13 +25,15 @@ editor_options:
 
 # Introduction
 
-The initial reason I started this project was to work on a web scraping endeavor.  What I began with was part one of this project, and scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  However, as things progressed and I wanted to mine more of the incident data, I discovered that the GVA website has a robot algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  Eventually, I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been needing to enhance my Python skills, and this was a practical avenue to move forward with that objecive.
+The initial reason I started this project was to work on a web scraping endeavor.  What I began with was part one of this project, and scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  
 
-The following took a few weeks of research and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did quesiton pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best lat lon information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing information.  GVA seems to have better data on the coordinates behind the scenes.
+However, as things progressed and I wanted to mine more of the incident data, I discovered that the GVA website has a robot checking algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  
 
-## Preface
+Eventually, I discovered that I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been working on enhancing my Python skills, and this was a practical avenue to move forward with that objecive.
 
-This is part two in a look at gun violence mass shootings in the US.  In this analysis, we will look at the shooting incident data geographically.
+The following took a few weeks of research, and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did quesiton pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best latitude and longitude information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing information.  GVA seems to have better data on the coordinates behind the scenes.
+
+Now I've got what I need to create some nice maps.  Let's go!
 
 # Setup
 
@@ -52,7 +54,6 @@ library(tidycensus)
 library(leaflet)
 library(reticulate)
 api_key <- Sys.getenv("CENSUS_API_KEY")
-knitr::opts_chunk$set(python.reticulate = FALSE)
 ```
 
 # Source the data
@@ -60,7 +61,7 @@ knitr::opts_chunk$set(python.reticulate = FALSE)
 Read in the saved data file.
 
 ```{r, include=TRUE}
-complete_tbl <- read_rds("gva_data.rds") 
+complete_tbl <- read_rds("gva_data.rds")
 ```
 
 Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
@@ -102,9 +103,9 @@ new_geo_locations_incidents_tbl <- new_incident_ids %>%
 
 # Webscraping with Python
 
-Now we can scrape using Python which gives us a lot more flexibility than RSelenium does (or at least that I could figure out).
+Now we can scrape using Python which gives us a lot more flexibility than RSelenium does (at least as far as I was able to discern).
 
-```{python}
+```{python, include=TRUE, eval=FALSE}
 
 # run these in terminal
 # pip install selenium
@@ -155,7 +156,7 @@ driver.close() # this closes the session.
 
 Pull the Python object into R, and back up the scraped data in case of R crash.
 
-```{r}
+```{r, include=TRUE, eval=FALSE}
 geo_data <- py$df # this command moves a Python object into an R object...Reticulate is pretty sweet!
 
 write_rds(geo_data, "scrapped_geo_data.rds") # I stored the data as I went in case R crashed
@@ -202,7 +203,7 @@ ms_tbl_map_prep <- ms_tbl_map_data %>%
 
 # Create a leaflet map with default map tile using addTiles()
 ms_tbl_map_prep %>% 
-    leaflet() %>%
+    leaflet(height = 1000, width = 1000) %>%
     addProviderTiles("CartoDB") %>% 
     addCircleMarkers(label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
                                     htmltools::HTML), radius = 3, color = "black", clusterOptions = markerClusterOptions()) %>%
@@ -214,26 +215,32 @@ ms_tbl_map_prep %>%
 # Mapping Incidents Over Time with gganimate
 
 ```{r animated map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
-library(gganimate)
-
 ms_tbl_map_prep %>% 
-    mutate(year = factor(year)) %>% 
+    mutate(color_year = factor(year),
+           size = (number_killed + number_injured)) %>% 
     filter(state != "Alaska") %>% 
     ggplot(aes(longitude, latitude, 
-               size = number_killed + number_injured,
-               color = year)) +
-    geom_point() +
+               size = size,
+               color = color_year)) +
+    geom_point(alpha = 0.7) +
     borders("state") +
     scale_color_tq() +
     coord_map() +
     theme_light() +
-    labs(title = "Map of Mass Shooting Incidents in {closest_state}",
+    labs(title = "Map of Mass Shooting Incidents",
          subtitle = "Size represents the total deaths and injuries per incident",
          x = "",
-         y = "") +
-    theme(legend.position = "none") +
-    transition_states(year, transition_length = 1, state_length = 1, ) +
-    enter_fade()
+         y = "",
+         color = "Year",
+         size = "Injuries & Deaths") 
+    theme(legend.position = "none")
+```
+
+
+```{r animated map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
+ms_tbl_map_prep %>% 
+    filter(year == 2015) %>% 
+    slice_max(order_by = number_injured + number_killed, n = 10)
 ```
 
 Mappings with census data?

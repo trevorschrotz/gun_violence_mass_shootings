@@ -1,10 +1,10 @@
 state,n_incidents,n_deaths,n_injuries,state_code,incidents_rank
 Illinois,405,281,1743,IL,1
-California,362,417,1435,CA,2
-Texas,263,461,1070,TX,3
+California,363,417,1439,CA,2
+Texas,264,462,1073,TX,3
 Florida,231,292,1018,FL,4
-New York,184,106,796,NY,5
-Pennsylvania,184,150,741,PA,5
+Pennsylvania,186,153,746,PA,5
+New York,185,106,800,NY,6
 Louisiana,175,138,751,LA,7
-Georgia,151,163,588,GA,8
+Georgia,152,163,592,GA,8
 Ohio,150,158,636,OH,9
