@@ -27,7 +27,7 @@ editor_options:
 
 ## Preface
 
-Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of a priori tuning effects on individual opinions and beliefs.  What follows is a scientific analysis of mass shooting phenomena in the US.  An open and scientific mind was applied to data to produce information about the aforementioned phenomena both as a learning experience for the author and an informative experience for the public.  No matter what your beliefs are, please keep an open mind as you process the information that follows.
+Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of a priori tuning effects on individual opinions and beliefs.  What follows is a scientific analysis of mass shooting phenomena in the US.  An open and scientific mind was applied to data to produce information about the aforementioned phenomena both as a learning experience for the author and an informative experience for the public.  No matter what your beliefs are nor what side of the politcal fence you reside on, please keep an open mind as you process the information that follows.
 
 ## Intent
 
