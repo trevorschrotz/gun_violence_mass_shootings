@@ -52,6 +52,7 @@ library(broom)
 library(purrr)
 library(tidycensus)
 library(leaflet)
+library(usmap)
 library(reticulate)
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
@@ -168,7 +169,7 @@ Update the geo locations file with the new records and save it.
 geo_data <- read_rds("scrapped_geo_data.rds")
 
 output <- geo_data %>% 
-    transmute(test = str_extract(geo_data, "Geolocation.*")) # pull the geo location data
+    transmute(geo_data = str_extract(geo_data, "Geolocation.*")) # pull the geo location data
 
 ms_tbl_updated <- ms_tbl %>% 
     anti_join(ms_tbl_updated_geo_locs, by = "incident_id") %>% 
@@ -186,62 +187,90 @@ ms_tbl_updated %>%
               n_dist = n_distinct(incident_id)) # check it
 ```
 
-# Mapping Incidents with leaflet
+# Prepare the Map Data
 
-```{r map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 ms_tbl_map_data <- read_rds("ms_tbl_updated_geo_locs.rds")
 
 ms_tbl_map_prep <- ms_tbl_map_data %>% 
-    rename("GeoLocation" = test) %>% 
+    rename("GeoLocation" = geo_data) %>% 
     mutate(temp = GeoLocation,
            temp = str_remove_all(temp, "Geolocation: ")) %>% 
     separate(temp, into = c("latitude","longitude"), sep = ", ") %>% 
-    mutate(across(latitude:longitude, ~ as.numeric(.)))
-
-# List the available map tiles
-#names(providers)
-
-# Create a leaflet map with default map tile using addTiles()
-ms_tbl_map_prep %>% 
-    leaflet(height = 1000, width = 1000) %>%
-    addProviderTiles("CartoDB") %>% 
-    addCircleMarkers(label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
-                                    htmltools::HTML), radius = 3, color = "black", clusterOptions = markerClusterOptions()) %>%
-    addProviderTiles("CartoDB", group = "CartoDB") %>%
-    addProviderTiles("Esri", group = "Esri") %>%
-    addLayersControl(baseGroups = c("Esri","CartoDB")) # Use addLayersControl to allow users to toggle between basemaps
+    mutate(across(latitude:longitude, ~ as.numeric(.)),
+           color_year = factor(year),
+           size = number_killed + number_injured,
+           date_formatted = format.Date(incident_date, format = "%b %d, %Y"),
+           label = str_glue("{city_or_county}, {state}
+                             {date_formatted}
+                             Injured: {number_injured} | Killed: {number_killed}"))
 ```
 
-# Mapping Incidents Over Time with gganimate
+```{r, include=TRUE, eval=FALSE, message=FALSE, warning=FALSE}
+# List the available map tiles
+names(providers)
+```
 
-```{r animated map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
+
+# Mapping Incidents with leaflet
+
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
 ms_tbl_map_prep %>% 
-    mutate(color_year = factor(year),
-           size = (number_killed + number_injured)) %>% 
-    filter(state != "Alaska") %>% 
-    ggplot(aes(longitude, latitude, 
-               size = size,
-               color = color_year)) +
-    geom_point(alpha = 0.7) +
-    borders("state") +
+    leaflet(height = 1000, width = 1000) %>%
+    addProviderTiles("Stamen.Toner") %>% 
+    addProviderTiles("Esri", group = "Esri") %>%
+    addCircleMarkers(label = lapply(str_glue("{month(ms_tbl_map_prep$incident_date, label = TRUE, abbr = TRUE)} {year(ms_tbl_map_prep$incident_date)} <br/> {ms_tbl_map_prep$city_or_county}, {ms_tbl_map_prep$state} <br/> {ms_tbl_map_prep$number_killed} killed | {ms_tbl_map_prep$number_injured} wounded"),
+                                    htmltools::HTML), radius = 3, color = "blue", clusterOptions = markerClusterOptions()) %>%
+    setView(lng = -90, lat = 20, zoom = 3.25) %>%
+    addLayersControl(baseGroups = c("Stamen.Toner","Esri"))
+```
+
+# Where have the worst mass shooting incidents occurred?
+
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
+worst_shootings <- ms_tbl_map_prep %>% 
+    slice_max(order_by = size, n = 10) %>% 
+    slice(1:10)
+
+worst_transformed <- usmap_transform(worst_shootings, input_names = c("longitude", "latitude"), output_names = c("x", "y"))
+
+set.seed(1984)
+plot_usmap(fill = "goldenrod1", alpha = 0.8) +
+    geom_point(data = worst_transformed, aes(x = x, y = y, size = size, color = color_year, text = label)) +
+    ggrepel::geom_label_repel(data = worst_transformed, 
+                              aes(x = x, y = y, label = label), 
+                              size = 2,
+                              color = "black", 
+                              min.segment.length = 0.1, 
+                              segment.colour = "blue3", 
+                              box.padding = 1,
+                              arrow = arrow(length = unit(0.01, "npc"))) +
     scale_color_tq() +
-    coord_map() +
-    theme_light() +
-    labs(title = "Map of Mass Shooting Incidents",
-         subtitle = "Size represents the total deaths and injuries per incident",
-         x = "",
-         y = "",
-         color = "Year",
-         size = "Injuries & Deaths") 
+    labs(title = str_glue("Map of the Ten Worst Mass Shooting Incidents Between {year(min(ms_tbl$incident_date))} and {year(max(ms_tbl$incident_date))}"),
+         subtitle = "Point size represents the total deaths and injuries per incident") +
     theme(legend.position = "none")
 ```
 
-
-```{r animated map, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
-ms_tbl_map_prep %>% 
-    filter(year == 2015) %>% 
-    slice_max(order_by = number_injured + number_killed, n = 10)
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
+all_transformed <- usmap_transform(ms_tbl_map_prep, input_names = c("longitude", "latitude"), output_names = c("x", "y")) %>% 
+    filter(state %in% c("Illinois"), city_or_county == "Chicago")
+ 
+plot_usmap(regions = "county", alpha = 0.8, include = 17031, labels = TRUE) +
+    geom_density2d(data = all_transformed, 
+                   aes(x, y, fill = ..level.., alpha = ..level..), 
+                   bins = 20) +
+    stat_density2d(data = all_transformed, 
+                   aes(x, y, fill = ..level.., alpha = ..level..), 
+                   bins = 20, 
+                   geom = "density_2d_filled") +
+    scale_fill_gradient(low = "lightblue", high = "firebrick3") +
+    labs(title = "Heatmap of Mass Shooting Incidents by Year",
+         x = "",
+         y = "") +
+    theme(legend.position = "none")
 ```
+
+leaflet shiny dashboard?
 
 Mappings with census data?
 

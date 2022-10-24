@@ -40,7 +40,6 @@ library(tidytext)
 library(lubridate)
 library(scales)
 library(janitor)
-library(tidymodels)
 library(modeltime)
 library(tictoc)
 library(future)
@@ -275,6 +274,8 @@ Visualize future forecast
 # # * Visualize Future Forecast ----
 nested_best_refit_tbl %>%
     extract_nested_future_forecast() %>%
+    mutate(.conf_lo = case_when(.conf_lo < 0 ~ 0,
+                                TRUE ~ .conf_lo)) %>% 
     group_by(state) %>%
     plot_modeltime_forecast(.facet_ncol = 3)
 ```
