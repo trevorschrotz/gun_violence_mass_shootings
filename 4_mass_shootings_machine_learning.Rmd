@@ -18,6 +18,7 @@ library(tictoc)
 library(future)
 library(doFuture)
 library(tidyquant)
+library(leaflet)
 
 registerDoFuture()
 
@@ -115,12 +116,21 @@ ml_illinois %>%
 
 # The Question - Given the time and locaiton data we have, can we provide insights into when and where mass shootings might occur?  Would this prediction be helpful to police and communities in an effort to prevent these events from happening?  Let's start with a tree based model and see what that yields.
 
+```{r}
+ml_chicago <- ml_illinois %>% 
+    mutate(month = as.character(month),
+           dow = as.character(dow)) %>% 
+    filter(city_or_county == "Chicago") %>% 
+    select(-latitude, -longitude)
+```
+
+
 # Split Data into Training and Testing Sets with Additional Cross-Fold Validation
 
 ```{r}
 set.seed(1975)
 
-illinois_split <- ml_illinois %>% 
+illinois_split <- ml_chicago %>% 
     initial_split(prop = 0.8, strata = number_casualties)
 
 illinois_train <- training(illinois_split)
@@ -138,13 +148,49 @@ illinois_tree_recipe <-
     update_role(incident_id, new_role = "id") %>% 
     update_role(state, new_role = "id") %>% 
     update_role(city_or_county, new_role = "id") %>% 
+    step_other(month, threshold = 0.05) %>% 
     step_dummy(all_nominal_predictors())
+
+illinois_tree_recipe %>% 
+    prep() %>% 
+    bake(new_data = illinois_train)
 ```
 
 
 ```{r}
+xgboost_spec <- boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(), learn_rate = tune()) %>% 
+    set_engine("xgboost") %>% 
+    set_mode("regression")
 
+xgboost_workflow <- workflow() %>% 
+    add_recipe(illinois_tree_recipe) %>% 
+    add_model(xgboost_spec) 
+
+set.seed(1984)
+
+xg_tune_grid <- grid_random(trees(), min_n(), tree_depth(), learn_rate(), size = 10)
+
+xgboost_tune <- tune_grid(xgboost_workflow, resamples = illinois_vfolds, grid = xg_tune_grid)
+
+xgboost_tune %>% show_best()
+
+best_xg <- xgboost_tune %>% 
+    select_best(metric = "rmse")
+
+final_xg_workflow <- xgboost_workflow %>% 
+    finalize_workflow(best_xg)
+
+xg_wf_fit <- final_xg_workflow %>% 
+             fit(data = illinois_train)
+
+xg_fit <- xg_wf_fit %>% 
+    extract_fit_parsnip()
+
+vip::vip(xg_fit)
 ```
+
+
+
 
 
 

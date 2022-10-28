@@ -35,7 +35,7 @@ The intent of this analysis is purely scientific and has neither political motiv
 
 ## Overview
 
-Gun violence is a pervasive issue in American culture.  This analysis is focused upon mass shootings specifically which are defined as a shooting incident where at least four people are injured and/or killed not including the perpetrator(s) of the gun violence.  It is recommended that this analysis be used to educate oneself on the the statistical facts around mass shootings.  The source of these data are the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
+Gun violence is a pervasive issue in American culture.  This analysis is focused upon mass shootings specifically which are defined as a shooting incident where at least four people are injured and/or killed not including the perpetrator(s) of the gun violence.  It is recommended that this analysis be used to educate oneself on the the statistical facts around mass shootings.  The source of these data is the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
 
 # Setup
 
@@ -539,7 +539,7 @@ ma_tbl %>%
 
 It's now clearer to see the increasing trend in the twelve month moving average line in black, and the seasonal monthly trend of the six month moving average in red.  You can see how the red line moves above and below the black line clearly revealing the seasonal component of mass shootings.
 
-Additionally, we can also see that since 2020, the variability in the number of mass shootings has increased as the red line goes much higher than in previous years.  The is obvious given the increase in volume, but it's worth noting the change in the total system behavior.  Further, whilst 2020 was an aberrant year given the pandemic, assuming a potential relationship between the impact of the pandemic on US society and mass shooting behavior, the prevalance has not returned back to pre-pandemic levels given that we are now in a post-pandemic environment.
+Additionally, we can also see that since 2020, the variability in the number of mass shootings has increased as the red line goes much higher than in previous years.  The is obvious given the increase in volume, but it's worth noting the change in the total system behavior.  Further, whilst 2020 was an aberrant year given the pandemic, assuming a potential relationship between the impact of the pandemic on US society and mass shooting behavior, the prevalence has not returned back to pre-pandemic levels given that we are now in a post-pandemic environment.
 
 ## Incidents, Deaths, and Injuries by Month
 
