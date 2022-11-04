@@ -1,11 +1,11 @@
 ---
 title: "Mass Shooting Gun Violence in the United States of America"
-subtitle: "Time Series Models"
+subtitle: "Part III: Time Series Models"
 author: "Trevor Schrotz"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
   html_document:
-    theme: lumen
+    theme: paper
     df_print: paged
     code_folding: hide
     toc: true
@@ -17,7 +17,7 @@ editor_options:
 
 <style type="text/css">
 .main-container {
-  max-width: 1400px;
+  max-width: 1800px;
   margin-left: auto;
   margin-right: auto;
 }
