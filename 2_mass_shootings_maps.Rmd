@@ -160,13 +160,13 @@ Pull the Python object into R, and back up the scraped data in case of R crash.
 ```{r, include=TRUE, eval=FALSE}
 geo_data <- py$df # this command moves a Python object into an R object...Reticulate is pretty sweet!
 
-write_rds(geo_data, "scrapped_geo_data.rds") # I stored the data as I went in case R crashed
+write_rds(geo_data, "scraped_geo_data.rds") # I stored the data as I went in case R crashed
 ```
 
 Update the geo locations file with the new records and save it.
 
 ```{r, include=TRUE, eval=FALSE}
-geo_data <- read_rds("scrapped_geo_data.rds")
+geo_data <- read_rds("scraped_geo_data.rds")
 
 output <- geo_data %>% 
     transmute(geo_data = str_extract(geo_data, "Geolocation.*")) # pull the geo location data
