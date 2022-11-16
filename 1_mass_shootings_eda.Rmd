@@ -1,6 +1,6 @@
 ---
 title: "Mass Shooting Gun Violence in the United States of America"
-subtitle: "Part I: Exploratory Data Analysis"
+subtitle: "Exploratory Data Analysis, Mapping, and Time Series Forecasting"
 author: "Trevor Schrotz"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -70,11 +70,23 @@ library(broom)
 library(purrr)
 library(rvest)
 library(tidycensus)
-#library(tidygeocoder)
 library(knitr)
 library(leaflet)
 library(usmap)
 library(reticulate)
+library(tictoc)
+library(future)
+library(doFuture)
+library(timetk)
+library(thief)
+
+registerDoFuture()
+
+n_cores <- parallel::detectCores()
+
+plan(strategy = cluster,
+     workers  = parallel::makeCluster(n_cores))
+
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
 
@@ -996,7 +1008,7 @@ ms_tbl_map_prep <- ms_tbl_map_data %>%
 
 ## Mapping Incidents with Leaflet
 
-```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
 ms_tbl_map_prep %>% 
     leaflet(height = 1000, width = 1000) %>%
     addProviderTiles("Stamen.Toner") %>% 
@@ -1031,6 +1043,161 @@ plot_usmap(fill = "goldenrod1", alpha = 0.8) +
     labs(title = str_glue("Map of the Ten Worst Mass Shooting Incidents Between {year(min(ms_tbl$incident_date))} and {year(max(ms_tbl$incident_date))}"),
          subtitle = "Point size represents the total deaths and injuries per incident") +
     theme(legend.position = "none")
+```
+
+# Time Series Modeling
+
+Time series modeling is a form of machine learning that uses clues in the time series data to create predictive models about what might happen based upon events that have already occurred.  I will use the top nine highest mass shooting states to create predicive time series models.  Perhaps leaders from these states can elaborate on these models to help identify when things might get worse and then deploy community resources and programs to try to reduce the number of mass shootings.
+
+## Prepare and Nest Time Series Data
+
+We are planning on projecting out 12 months, and the following code sets up the data so that we can iterate over it with several different models and then pick the best ones for the forecasts.
+
+```{r, include=TRUE, eval=FALSE}
+future_date <- 12
+
+ms_model_state_data <- ms_tbl %>%
+    filter(incident_date < floor_date(Sys.Date(), "month"),
+           year(incident_date) >= 2020) %>%
+    group_function(state, incident_month) %>%
+    select(-n_injuries, -n_deaths) %>%
+    complete(state, incident_month, fill = list(n_incidents = 0)) %>%
+    filter(state %in% top_nine_states)
+
+nested_data_tbl <- ms_model_state_data %>% 
+    group_by(state) %>%
+    modeltime::extend_timeseries(.id_var = state,
+                                 .date_var = incident_month,
+                                 .length_future = future_date) %>%
+    modeltime::nest_timeseries(.id_var = state,
+                    .length_future = future_date) %>%
+    modeltime::split_nested_timeseries(.length_test = future_date)
+```
+
+## Prepare Recipes and Model Workflows
+
+This code sets up the model recipes and creates workflows that use the recipes and their instructions.  I did not use any hyperparameter tuning in this project, but I would recommend that for a more in depth application.
+
+```{r, include=TRUE, eval=FALSE}
+
+# xgboost recipe
+rec_xgb <- recipe(n_incidents ~ ., extract_nested_train_split(nested_data_tbl)) %>%
+    step_timeseries_signature(incident_month) %>%
+    step_rm(incident_month) %>%
+    step_zv(all_predictors()) %>%
+    step_dummy(all_nominal_predictors(), one_hot = TRUE)
+
+# arima recipe
+rec_arima <- recipe(n_incidents ~ ., extract_nested_train_split(nested_data_tbl)) %>%
+    step_timeseries_signature(incident_month) %>%
+    step_zv(all_predictors()) %>%
+    step_dummy(all_nominal_predictors(), one_hot = TRUE)
+
+# xgboost models
+
+wflw_xgb_1 <- workflow() %>%
+    add_model(boost_tree("regression", learn_rate = 0.35) %>% set_engine("xgboost")) %>%
+    add_recipe(rec_xgb)
+
+wflw_xgb_2 <- workflow() %>%
+    add_model(boost_tree("regression", learn_rate = 0.50) %>% set_engine("xgboost")) %>%
+    add_recipe(rec_xgb)
+
+# random forest model
+wflw_rf_1 <- workflow() %>%
+    add_model(rand_forest("regression") %>% set_engine("ranger")) %>%
+    add_recipe(rec_xgb)
+
+# arima model
+wflw_arima_1 <- workflow() %>%
+    add_model(arima_boost("regression") %>% set_engine("arima_xgboost")) %>%
+    add_recipe(rec_arima)
+
+# prophet model
+wflw_prophet_1 <- workflow() %>%
+    add_model(prophet_boost("regression") %>% set_engine("prophet_xgboost")) %>%
+    add_recipe(rec_arima)
+```
+
+## Run models
+
+The following section fits the models to the data.
+
+```{r, include=TRUE, eval=FALSE}
+# # 2.0 SCALE ----
+parallel_start(16)
+
+nested_modeltime_tbl <- nested_data_tbl %>%
+    modeltime_nested_fit(
+        model_list = list(
+            wflw_xgb_1,
+            wflw_xgb_2,
+            wflw_rf_1,
+            wflw_arima_1,
+            wflw_prophet_1),
+        control = control_nested_fit(
+            verbose   = TRUE,
+            allow_par = TRUE))
+
+write_rds(nested_modeltime_tbl, "nested_modeltime_tbl.rds")
+```
+
+## Review Model Forecasts
+
+```{r, include=TRUE, eval=TRUE}
+nested_modeltime_tbl <- read_rds("nested_modeltime_tbl.rds")
+
+nested_modeltime_tbl %>%
+    extract_nested_test_forecast() %>%
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
+```
+
+## Choose the best models
+
+```{r, include=TRUE, eval=FALSE}
+nested_best_tbl <- nested_modeltime_tbl %>%
+    modeltime_nested_select_best(metric = "mae", minimize = TRUE)
+
+write_rds(nested_best_tbl, "best_models.rds")
+```
+
+## Visualize Best Models
+
+```{r, include=TRUE, eval=TRUE, out.width="100%", out.height="100%"}
+nested_best_tbl <- read_rds("best_models.rds")
+
+nested_best_tbl %>%
+    extract_nested_test_forecast() %>%
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
+```
+
+## Final Model Refits
+
+```{r, include=TRUE, eval=FALSE}
+nested_best_refit_tbl <- nested_best_tbl %>%
+    modeltime_nested_refit(
+        control = control_refit(
+            verbose   = TRUE,
+            allow_par = TRUE))
+
+parallel_stop()
+
+write_rds(nested_best_refit_tbl, "nested_best_refit_tbl.rds")
+```
+
+## Visualize the Forecasts
+
+```{r, include=TRUE, eval=TRUE, out.width="100%", out.height="100%"}
+nested_best_refit_tbl <- read_rds("nested_best_refit_tbl.rds")
+
+nested_best_refit_tbl %>%
+    extract_nested_future_forecast() %>%
+    mutate(.conf_lo = case_when(.conf_lo < 0 ~ 0,
+                                TRUE ~ .conf_lo)) %>% 
+    group_by(state) %>%
+    plot_modeltime_forecast(.facet_ncol = 3)
 ```
 
 # Summary

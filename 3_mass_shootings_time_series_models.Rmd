@@ -60,15 +60,16 @@ plan(strategy = cluster,
 
 Read in the saved data file.
 
-```{r, include=TRUE}
+```{r}
 complete_tbl <- read_rds("gva_data.rds") 
+
 top_nine_states <- read_csv("top_nine_states.csv") %>% 
     pull(state)
 ```
 
 Here I prepare the primary data set to include some date-related fields for convenience when plotting and summarizing the data.
 
-```{r cleaning, include=TRUE}
+```{r, include=TRUE, eval=TRUE}
 ms_tbl <- complete_tbl %>% 
     janitor::clean_names() %>% 
     select(-operations) %>% 
@@ -97,18 +98,8 @@ group_function <- function(df, ...) {
 ```
 
 Nesting the time series data
-```{r}
+```{r, include=TRUE, eval=FALSE}
 future_date <- 12
-
-# ms_model_data <- ms_tbl %>%
-#     filter(incident_date < floor_date(Sys.Date(), "month"),
-#            year(incident_date) >= 2020) %>%
-#     group_function(incident_month) %>%
-#     select(-n_injuries, -n_deaths) %>%
-#     mutate(state = "us")
-#     #group_by(state) %>%
-#     #filter(n() > 10) %>%
-#     #ungroup()
 
 ms_model_state_data <- ms_tbl %>%
     filter(incident_date < floor_date(Sys.Date(), "month"),
@@ -118,7 +109,7 @@ ms_model_state_data <- ms_tbl %>%
     complete(state, incident_month, fill = list(n_incidents = 0)) %>%
     filter(state %in% top_nine_states)
 
-nested_data_tbl <- ms_model_state_data %>% #ms_model_data %>%
+nested_data_tbl <- ms_model_state_data %>% 
     group_by(state) %>%
     modeltime::extend_timeseries(.id_var = state,
                                  .date_var = incident_month,
@@ -129,7 +120,7 @@ nested_data_tbl <- ms_model_state_data %>% #ms_model_data %>%
 ```
 
 Models
-```{r}
+```{r, include=TRUE, eval=FALSE}
 # # MODELING ----
 # # * XGBoost Recipe ----
 rec_xgb <- recipe(n_incidents ~ ., extract_nested_train_split(nested_data_tbl)) %>%
@@ -181,20 +172,17 @@ try_sample_tbl <- nested_data_tbl %>%
             wflw_xgb_2,
             wflw_rf_1,
             wflw_arima_1,
-            #wflw_ets_1,
             wflw_prophet_1),
         control = control_nested_fit(
             verbose   = TRUE,
             allow_par = FALSE))
-
-try_sample_tbl
 
 # * Check Errors ----
 try_sample_tbl %>% extract_nested_error_report()
 ```
 
 Scale up and process models
-```{r}
+```{r, include=TRUE, eval=FALSE}
 # # 2.0 SCALE ----
 parallel_start(16)
 
@@ -205,11 +193,12 @@ nested_modeltime_tbl <- nested_data_tbl %>%
             wflw_xgb_2,
             wflw_rf_1,
             wflw_arima_1,
-            #wflw_ets_1,
             wflw_prophet_1),
         control = control_nested_fit(
             verbose   = TRUE,
             allow_par = TRUE))
+
+write_rds(nested_modeltime_tbl, "nested_modeltime_tbl.rds")
 ```
 
 Error review
@@ -227,8 +216,10 @@ nested_modeltime_tbl %>%
 ```
 
 Test Forecast against actuals
-```{r}
+```{r, include=TRUE, eval=TRUE}
 # # * Visualize Test Forecast ----
+nested_modeltime_tbl <- read_rds("nested_modeltime_tbl.rds")
+
 nested_modeltime_tbl %>%
     extract_nested_test_forecast() %>%
     group_by(state) %>%
@@ -236,15 +227,19 @@ nested_modeltime_tbl %>%
 ```
 
 Select best models
-```{r}
+```{r, include=TRUE, eval=FALSE}
 # # 3.0 SELECT BEST ----
 nested_best_tbl <- nested_modeltime_tbl %>%
     modeltime_nested_select_best(metric = "mae", minimize = TRUE)
+
+write_rds(nested_best_tbl, "best_models.rds")
 ```
 
 Visualize best models
-```{r}
+```{r, include=TRUE, eval=TRUE}
 # # * Visualize Best Models ----
+nested_best_tbl <- read_rds("best_models.rds")
+
 nested_best_tbl %>%
     extract_nested_test_forecast() %>%
     group_by(state) %>%
@@ -252,7 +247,7 @@ nested_best_tbl %>%
 ```
 
 Model refits
-```{r}
+```{r, include=TRUE, eval=FALSE}
 # # 4.0 REFIT ----
 nested_best_refit_tbl <- nested_best_tbl %>%
     modeltime_nested_refit(
@@ -261,6 +256,8 @@ nested_best_refit_tbl <- nested_best_tbl %>%
             allow_par = TRUE))
 
 parallel_stop()
+
+write_rds(nested_best_refit_tbl, "nested_best_refit_tbl.rds")
 ```
 
 Final error review
@@ -270,8 +267,10 @@ nested_best_refit_tbl %>% extract_nested_error_report()
 ```
 
 Visualize future forecast
-```{r}
+```{r, include=TRUE, eval=TRUE}
 # # * Visualize Future Forecast ----
+nested_best_refit_tbl <- read_rds("nested_best_refit_tbl.rds")
+
 nested_best_refit_tbl %>%
     extract_nested_future_forecast() %>%
     mutate(.conf_lo = case_when(.conf_lo < 0 ~ 0,
