@@ -60,8 +60,7 @@ ml_prep %>%
          subtitle = str_glue("From {min(ml_prep$incident_date)} through {max(ml_prep %>% filter(incident_month < floor_date(Sys.Date(), 'month')) %>% pull(incident_date))}"),
          x = "Month",
          y = "",
-         caption = str_glue("Mass shooting defined as four or more victims not including perpetrator(s).
-                             Current incomplete month removed."))
+         caption = str_glue("Current incomplete month removed."))
 ```
 
 Let's try looking at 2020 forward in the "new normal" range.  I think this looks better and it mitigates the impact of time somewhat on the variability of the data year over year.

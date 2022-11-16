@@ -25,19 +25,31 @@ editor_options:
 
 # Introduction
 
+## Purpose
+
+This project began in June 2022 as an opportunity to learn web scraping using the language R inside the RStudio (now POSIT) IDE.  Quickly the project got more involved as I saw opportunities to learn and practice mapping skills, time series ML predictions, and so much more around data wrangling, plotting and visualizations, performing statistical tests, geocoding, and more web scraping with Python when I ran into a roadblock with an R package and a finicky web page.  
+
+Despite the heavy nature of the material, this has been a fun and interesting project, and I have learned so much from the R community that I hope that I can begin to repay that debt to some extent with this project.  I think some aspect of what is contained within will help make some analyst's or data scientist's life easier, and that is the experience I have had with R and the R community - free and open software and generous widespread sharing of knowledge.  
+
+The beauty of R is that I will share this analysis with everyone, and, if anyone is skeptical or curious, which people should be, they can get the same data and challenge my findings and conclusions with their own analysis.  I invite you to do so, if you are so inclined.  Please feel free to contact me if you would like to chat as I invite all constructive criticism.
+
 ## Preface
 
-Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of prior tuning effects on individual opinions and beliefs.  What follows is a scientific analysis of mass shooting phenomena in the US.
+Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of tuning effects on individual opinions and beliefs.  What follows is a analysis of mass shooting phenomena in the US.
 
 The intent of this analysis is purely scientific and it has neither political motive nor personal agenda other than to inform people about the state of mass shooting gun violence in the United States of America.  
 
-An open and scientific mind was applied to data to produce information about the aforementioned phenomena both as a learning experience for the author and an informative experience for the public.
+An open and scientific mind was applied to these data both as a learning experience for the author and an informative experience for the public.
 
 ## Overview
 
-Gun violence is a pervasive issue in American culture.  This analysis focuses on mass shootings in particular, and it does not include all types of US gun-related incidents.  A mass shooting is defined by the Federal Bureau of Investigation as a shooting in which four or more people are injured or killed not including the perpatrator(s) of the shooting.  The source of these data is the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
+Gun violence is a pervasive issue in American culture.  This analysis focuses on mass shootings in particular, and it does not include all types of US gun-related incidents.  
 
-The entire project is in four sections.  This first one is exploratory data analysis to gather an understanding of the data.  The second part is abour mapping mass shootings.  The third is about time series analysis, and the fourth is about machine learning.
+A mass shooting is defined by the Gun Violence Archive (GVA) as a shooting in which four or more people are injured or killed not including the perpetrator(s) of the shooting.
+
+The source of these data used in this project is the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
+
+The entire project is in three sections.  This first one is exploratory data analysis to gather an understanding of the data.  The second part is about mapping mass shootings.  The third is about time series analysis and predicting future trends.
 
 # Setup
 
@@ -64,7 +76,7 @@ library(knitr)
 api_key <- Sys.getenv("CENSUS_API_KEY")
 ```
 
-## Source Data from the GVA
+## Sourcing Data from the GVA
 
 To get the prolific amount of data from the GVA website, we can employ web scraping to read the html and turn it into a tidy tabular format for analysis.  I originally began this project as a way to learn web scraping, and the project evolved into the desire to learn even more as I explored the data.
 
@@ -144,7 +156,7 @@ ms_2019_tbl <- map_df(ms_scrape_2019$scrape, ~ html_table(.x))
 #2019 through 2022
 ms_pages_2019_2022 <- 
     tibble(pages = c("https://www.gunviolencearchive.org/mass-shooting",
-                                       str_c("https://www.gunviolencearchive.org/mass-shooting?page=",c(1:80))))
+                                       str_c("https://www.gunviolencearchive.org/mass-shooting?page=",c(1:79))))
 
 
 ms_scrape_2019_2022 <- ms_pages_2019_2022 %>%
@@ -219,7 +231,7 @@ ms_tbl %>%
     sample_n(size = 10)
 ```
 
-A broad glimpse of the data.  No data are missing.  Some notable points with regards to the day of the week and perhaps the month.  We see that the data span from Jan 2014 through Sep 2022.  Deaths and injuries range from zero to 59 and 441 respectively, per incident.
+A broad glimpse of the data.  No data are missing.  Some notable points with regards to the day of the week and perhaps the month.  Deaths and injuries range from zero to 59 and 441 respectively, per incident.
 
 ```{r first summary, include=TRUE}
 skim(ms_tbl)
@@ -311,16 +323,17 @@ gr_table %>%
     geom_point(size = 5) +
     geom_text(aes(label = percent(value, accuracy = 0.1)), size = 3, color = "black", vjust = -1.2) +
     geom_hline(yintercept = 0, color = "gray30") +
-    expand_limits(x = c(2014, 2022), y = c(-0.25, 0.5)) +
+    expand_limits(x = c(2014.5, 2021.5), y = c(-0.25, 0.5)) +
     scale_y_continuous(labels = label_percent(accuracy = 1)) +
     theme_tq() +
     scale_color_tq() +
     facet_grid(~fct_inorder(name)) +
-    labs(title = "Percentage Change in Volume of Mass Shootings, Deaths, and Injuries by Year",
+    labs(title = "Annual Percentage Change in Volume of Mass Shootings, Deaths, and Injuries",
          x = "",
          y = "% Change From Prior Year",
          caption = "current incomplete year removed") +
-    theme(legend.position = "none")
+    theme(legend.position = "none",
+          plot.title = element_text(size = 12))
 ```
 
 ## Total Growth Rate
@@ -382,6 +395,31 @@ ms_tbl %>%
     theme(legend.position = "none")
 ```
 
+### Seasonal Statistics
+
+Follow up question.  What proportion of shootings happen in the different seasons (roughly approximated by season starting month)?
+
+```{r}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, month) %>% 
+    select(month:n_incidents) %>% 
+    summarize(n = n(),
+              winter = sum(n_incidents[month %in% c("Dec","Jan","Feb")]),
+              spring = sum(n_incidents[month %in% c("Mar","Apr","May")]),
+              summer = sum(n_incidents[month %in% c("Jun","Jul","Aug")]),
+              fall =   sum(n_incidents[month %in% c("Sep","Oct","Nov")]),
+              .groups = "drop") %>% 
+    mutate(spring_prop = spring / n,
+           summer_prop = summer / n,
+           fall_prop = fall / n,
+           winter_prop = winter / n) %>% 
+    select(contains("prop")) %>% 
+    mutate(across(everything(), ~ percent(., accuracy = 0.1)))
+```
+
+Mass shootings are approximately 10% more common in the summer months and approximately 10% less common in the winter when compared to spring and fall months.
+
 ## Incidents by Weekday
 
 Which days of the week tend to have more or less mass shootings?
@@ -402,6 +440,24 @@ ms_tbl %>%
          caption = "current incomplete year removed") +
     theme(legend.position = "none")
 ```
+
+### Weekend Proportion
+
+Follow up question. What is the proportion of weekend mass shootings?
+
+```{r}
+ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, dow) %>% 
+    select(dow:n_incidents) %>% 
+    summarize(n = n(),
+              sat_sun = sum(n_incidents[dow %in% c("Sat","Sun")]),
+              .groups = "drop") %>% 
+    transmute(weekend_prop = sat_sun / n,
+              weekend_prop = percent(weekend_prop, accuracy = 0.1))
+```
+
+About 51% of mass shootings occur on weekends.
 
 ## Month and Weekday Proportions
 
@@ -426,60 +482,17 @@ ms_tbl %>%
     guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 ```
 
-## Relationships Between Variables
+# Statistical Tests
 
-### Chi-Squared Test - Weekday vs Month
+## Relationships Between Variables
 
 We have seen that there are some days that have higher numbers of mass shootings as well as some months that are higher than others.  That creates questions.
 
-First, is there a statistically significant relationship between the day of the week when a mass shooting occurs and the month in which the shooting happens?
-
-We can use a chi-squared test of independence to test our question.
-
-```{r chi test one, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
-chi_tbl <- ms_tbl %>% 
-    filter(year(incident_date) < year(Sys.Date())) %>% 
-    group_function(incident_id, month, dow) %>% 
-    select(month:n_incidents)
-
-chi_tbl %>% 
-    table()
-
-chisq_test(x = chi_tbl, formula = dow ~ month)
-```
-
-The answer is that we don't have enough evidence to support the hypothesis that there is a significant relationship between the mass shooting day of the week and the month in which is occurs.  The Sundays in Jun, Jul, and Aug stand out with higher volumes, but there isn't a statistically significant difference in those months and days of the week at the p < 0.05 significance level.
-
-### Seasonal Statistics
-
-Follow up question.  What proportion of shootings happen in the different sesaons (roughly approximated by season starting month)?
-
-```{r}
-ms_tbl %>% 
-    filter(year(incident_date) < year(Sys.Date())) %>% 
-    group_function(incident_id, month) %>% 
-    select(month:n_incidents) %>% 
-    summarize(n = n(),
-              winter = sum(n_incidents[month %in% c("Dec","Jan","Feb")]),
-              spring = sum(n_incidents[month %in% c("Mar","Apr","May")]),
-              summer = sum(n_incidents[month %in% c("Jun","Jul","Aug")]),
-              fall =   sum(n_incidents[month %in% c("Sep","Oct","Nov")]),
-              .groups = "drop") %>% 
-    mutate(spring_prop = spring / n,
-           summer_prop = summer / n,
-           fall_prop = fall / n,
-           winter_prop = winter / n) %>% 
-    select(contains("prop")) %>% 
-    mutate(across(everything(), ~ percent(., accuracy = 0.1)))
-```
-
-Mass shootings are approximately 10% more common in the summer months and approximately 10% less likely in the winter when compared to spring and fall months.
-
 ### Chi-Squared Test - Weekday
 
-Second, is there a significant difference in the number of mass shootings by the day of the week?  Again, we can use a chi-squared test checking for the goodness of fit where we essentially test the assumption that there is no difference in the proportion of mass shootings by day of the week.  In other words, each day should have proportionally the same volume of mass shootings.
+Is there a significant difference in the number of mass shootings by the day of the week?  We can use a chi-squared test checking for the goodness of fit where we essentially test the assumption that there is no difference in the proportion of mass shootings by day of the week.  In other words, each day should have proportionally the same volume of mass shootings.
 
-```{r chi test two, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+```{r, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
 chi_dow_tbl <- ms_tbl %>% 
     filter(year(incident_date) < year(Sys.Date())) %>% 
     group_function(incident_id, dow) %>% 
@@ -498,25 +511,59 @@ chisq_test(chi_dow_tbl,
                  "Sat" = 1/7))
 ```
 
-The answer here is yes, there is a significant difference in the volume of mass shooting incidents in different days of the week.
+The answer here is yes, there is a significant difference in the volume of mass shooting incidents in different days of the week at the p < 0.05 level.
 
-### Weekend Proportion
+### Chi-Squared Test - Month
 
-Follow up question. What is the proportion of weekend mass shootings?
+Is there a significant difference between months in terms of the number of mass shooting incidents?
 
-```{r}
-ms_tbl %>% 
+```{r, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+chi_month_tbl <- ms_tbl %>% 
     filter(year(incident_date) < year(Sys.Date())) %>% 
-    group_function(incident_id, dow) %>% 
-    select(dow:n_incidents) %>% 
-    summarize(n = n(),
-              sat_sun = sum(n_incidents[dow %in% c("Sat","Sun")]),
-              .groups = "drop") %>% 
-    transmute(weekend_prop = sat_sun / n,
-              weekend_prop = percent(weekend_prop, accuracy = 0.1))
+    group_function(incident_id, month) %>% 
+    select(month:n_incidents)
+
+chi_month_tbl %>% table()
+
+chisq_test(chi_month_tbl, 
+           response = month,
+           p = c("Jan" = 1/12,
+                 "Feb" = 1/12,
+                 "Mar" = 1/12,
+                 "Apr" = 1/12,
+                 "May" = 1/12,
+                 "Jun" = 1/12,
+                 "Jul" = 1/12,
+                 "Aug" = 1/12,
+                 "Sep" = 1/12,
+                 "Oct" = 1/12,
+                 "Nov" = 1/12,
+                 "Dec" = 1/12))
 ```
 
-About 51% of mass shootings occur on weekends.
+Yes, there is a significant difference between some months at the p < 0.05 level.
+
+### Chi-Squared Test - Weekday and Month
+
+Is there a statistically significant relationship between the day of the week when a mass shooting occurs and the month in which the shooting happens?
+
+We can use a chi-squared test of independence to test our question.
+
+```{r, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
+chi_tbl <- ms_tbl %>% 
+    filter(year(incident_date) < year(Sys.Date())) %>% 
+    group_function(incident_id, month, dow) %>% 
+    select(month:n_incidents)
+
+chi_tbl %>% 
+    table()
+
+chisq_test(x = chi_tbl, formula = dow ~ month)
+```
+
+The answer is that we don't have enough evidence to reject the null hypothesis which asserts that there is no difference between the mass shooting days of the week and the months in which they occur.  The Sundays in Jun, Jul, and Aug stand out with higher volumes, but there isn't a statistically significant difference in those months and days of the week at the p < 0.05 significance level.
+
+This is interesting given that the days of the week and the months tests were both significant, but in concert there is no evidence to suggest that they are significantly different.
 
 ## Seasonality and Trend Exploration
 
@@ -546,7 +593,8 @@ ma_tbl %>%
     labs(title = "Mass Shooting Monthly Incident Count Moving Averages",
          subtitle = "Red line is the 6 month moving average, black line is the 12 month moving average",
          x = "",
-         y = "Number of Mass Shooting Incidents")
+         y = "Number of Mass Shooting Incidents",
+         caption = "current incomplete month removed")
 ```
 
 It's now clearer to see the increasing trend in the twelve month moving average line in black, and the seasonal monthly trend of the six month moving average in red.  You can see how the red line moves above and below the black line clearly revealing the seasonal component of mass shootings.
@@ -618,7 +666,7 @@ ms_tbl %>%
     ggplot(aes(fct_reorder(state, n_incidents), n_incidents)) +
     geom_col(fill = "steelblue", color = "gray30", alpha = 0.8) +
     geom_text(aes(label = n_incidents), hjust = -0.1, size = 2.5) +
-    scale_y_continuous(limits = c(0, 420), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 450), expand = c(0, 0)) +
     coord_flip() +
     theme_tq() +
     labs(title = "States Ordered by Number of Mass Shootings",
@@ -767,6 +815,10 @@ ranked_cities <- ms_tbl %>%
     mutate(rank = row_number(),
            city = fct_reorder(city, number_incidents, max))
 
+top_5_cities <- ranked_cities %>% 
+    slice_min(order_by = rank, n = 5) %>% 
+    pull(city)
+
 ranked_cities %>% 
     ggplot(aes(rank, number_incidents)) +
     geom_point(alpha = 0.9, shape = 1, color = "gray40", size = 1) +
@@ -803,19 +855,13 @@ ranked_cities %>%
           axis.text.y = element_text(size = 6))
 ```
 
-## Deadliest Zip Codes
-
-```{r}
-
-```
-
 # Summary
 
 What do we know so far?  
 
 Mass shootings incidents are increasing since 2014 at an average annual rate of 14%.  Since 2020, the number of mass shootings has increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
 
-Saturdays and Sundays tend to have more mass shootings, and account for about half of the mass shooting weekdays where Monday through Friday account for the remaining half.
+Saturdays and Sundays tend to have more mass shootings and account for about half of the mass shooting weekdays where Monday through Friday account for the remaining half.
 
 Summer months account for 35% of mass shootings where winter months account for 15% leaving fall and spring similar at approximately 25% each proportionately.  
 
@@ -823,7 +869,8 @@ Only `r state_count` of fifty states since 2014 have not had a mass shooting - `
 
 The top five states (including Washington, DC) with the most total mass shootings since 2014 are `r knitr::combine_words(top_five_states)`.
 
-Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C., in fact, you are three times more likely than the next closest state which is Delaware in 2021.  
+Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C.; in fact, you are three times more likely on a per capita basis than the next closest state which is Delaware in 2021.  
 
-D.C. is extraordinarily higher, not in total volume, but in the number of mass shootings per person in the D.C. population.  
 Illinois, which is highest in total volume, also makes the list for states with the highest mass shootings, injuries, and deaths per capita.  The other top volume states, California, Texas, Florida, and Pennsylvania do not share that distinction in 2021.
+
+The top five US cities with the most mass shooting incidents are `r knitr::combine_words(top_5_cities)`.
