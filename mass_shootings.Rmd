@@ -580,7 +580,7 @@ The answer is that we don't have enough evidence to reject the null hypothesis w
 
 This is interesting given that the days of the week and the months tests were both significant, but in concert there is no evidence to suggest that they are significantly different.
 
-## Seasonality and Trend Exploration
+# Seasonality and Trend Exploration
 
 We noted before that there are seasonal trends in the data, so I am going to bring those forward using moving averages which are simply an average of the volume of mass shootings over a given window of time.  In this case, I will use two windows - one for a six month moving average to highlight the seasonality, and a second moving average of 12 months to highlight the trend of increasing numbers of mass shootings.  We appear to have a new post-pandemic normal.
 
