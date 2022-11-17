@@ -303,7 +303,7 @@ ms_tbl %>%
          subtitle = str_glue("From {min(ms_tbl$incident_date)} through {max(ms_tbl %>% filter(incident_month < floor_date(Sys.Date(), 'month')) %>% pull(incident_date))}"),
          x = "Month",
          y = "",
-         caption = "Current incomplete month removed.")
+         caption = "current incomplete month removed")
 ```
 
 ## Annual Growth Rate Table
@@ -614,7 +614,7 @@ ma_tbl %>%
 
 It's now clearer to see the increasing trend in the twelve month moving average line in black, and the seasonal monthly trend of the six month moving average in red.  You can see how the red line moves above and below the black line clearly revealing the seasonal component of mass shootings.
 
-Additionally, we can also see that since 2020, the variability in the number of mass shootings has increased as the red line goes much higher than in previous years.  The is obvious given the increase in volume, but it's worth noting the change in the total system behavior.  Further, whilst 2020 was an aberrant year given the pandemic, assuming a potential relationship between the impact of the pandemic on US society and mass shooting behavior, the prevalence has not returned back to pre-pandemic levels given that we are now in a post-pandemic environment.
+Additionally, we can also see that since 2020, the variability in the number of mass shootings has increased as the red line goes much higher than in previous years.  This is obvious given the increase in volume, but it's worth noting the change in the total system behavior.  Further, whilst 2020 was an aberrant year given the pandemic, assuming a potential relationship between the impact of the pandemic on US society and mass shooting behavior, the prevalence has not returned back to pre-pandemic levels given that we are now in a post-pandemic environment.
 
 ## Incidents, Deaths, and Injuries by Month
 
@@ -799,7 +799,7 @@ top_cities_incidents %>%
          y = "",
          title = str_glue("Top {length(unique(top_cities_incidents$state))} US Cities by Total Number of Mass Shooting Incidents"),
          subtitle = "Cities are Sorted in Descending Order",
-         caption = "Current incomplete year removed") +
+         caption = "current incomplete year removed") +
     theme(legend.position = "none",
           strip.text.x = element_text(size = 6),
           axis.text.x = element_text(size = 5),
