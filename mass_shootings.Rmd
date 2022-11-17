@@ -35,7 +35,9 @@ The beauty of R is that I will share this analysis with everyone, and, if anyone
 
 ## Preface
 
-Guns. Gun violence. Gun rights.  These are highly contentious and controversial issues that come with a host of tuning effects on individual opinions and beliefs.  What follows is a analysis of mass shooting phenomena in the US.
+What follows is a analysis of mass shooting phenomena in the US.
+
+Guns.  Gun rights.  Gun violence.  These are highly contentious and controversial issues that come with a host of tuning effects on individual opinions and beliefs.  
 
 The intent of this analysis is purely scientific and it has neither political motive nor personal agenda other than to inform people about the state of mass shooting gun violence in the United States of America.  
 
@@ -43,13 +45,13 @@ An open and scientific mind was applied to these data both as a learning experie
 
 ## Overview
 
-Gun violence is a pervasive issue in American culture.  This analysis focuses on mass shootings in particular, and it does not include all types of US gun-related incidents.  
+Gun violence is a pervasive issue in American culture.  This analysis focuses on mass shootings in particular, and it does not include all types of US gun-related incidents.
 
-A mass shooting is defined by the Gun Violence Archive (GVA) as a shooting in which four or more people are injured or killed not including the perpetrator(s) of the shooting.
+The source of these data used in this project is the Gun Violence Archive (GVA), and the original sources of the shootings are news media reports and law enforcement reports.  The GVA can be located at https://www.gunviolencearchive.org.  Special thanks is due to the GVA for their effort in recording and documenting these data and sharing them with the public.
 
-The source of these data used in this project is the Gun Violence Archive, and the original sources of the shootings are news media reports and law enforcement reports.
+A mass shooting is defined by the Gun Violence Archive as a shooting in which four or more people are injured or killed not including the perpetrator(s) of the shooting.
 
-The entire project is in three sections.  This first one is exploratory data analysis to gather an understanding of the data.  The second part is about mapping mass shootings.  The third is about time series analysis and predicting future trends.
+I approached this project in three frames: exploratory data analysis, mapping, and time series forecasting.
 
 # Setup
 
@@ -219,7 +221,7 @@ ms_tbl <- complete_tbl %>%
 
 ## Grouping and Summarizing Function
 
-This is a function to group and summarize the data in different ways since we will need to do this many times later.  Function are very helpful in R particularly when you need to do the same thing over and over.
+This is a function to group and summarize the data in different ways since we will need to do this many times later.  Functions are very helpful in R particularly when you need to do the same thing over and over.
 
 ```{r grouping function, include=TRUE}
 group_function <- function(df, ...) {
@@ -239,14 +241,14 @@ group_function <- function(df, ...) {
 
 ## First Look
 
-An initial look at a sample of ten rows of the data.  Each row represents one mass shooting incident.  Each incident has its own unique ID, a date, geographic location, and statistics about the number of injuries and deaths as well as some date related data that I added above to assist with analysis.
+This is an initial look at a sample of ten rows of the data.  Each row represents one mass shooting incident.  Each incident has its own unique ID, a date, geographic location, and statistics about the number of injuries and deaths as well as some date related data that I added above to assist with analysis.
 
 ```{r first look, include=TRUE}
 ms_tbl %>% 
     sample_n(size = 10)
 ```
 
-A broad glimpse of the data.  No data are missing.  Some notable points with regards to the day of the week and perhaps the month.  Deaths and injuries range from zero to 59 and 441 respectively, per incident.
+Below is a broad summary of the data.  No data are missing.  Some notable points with regards to the day of the week and perhaps the month.  Deaths and injuries range from zero to 59 and 441 respectively, per incident.
 
 ```{r first summary, include=TRUE}
 skim(ms_tbl)
@@ -328,7 +330,7 @@ gr_table %>%
 
 This chart shows how the volume of mass shootings and the resulting deaths and injuries have either increased or decreased over the years.  Anything above zero is an increase from the prior year, and anything below zero is a decrease.
 
-Only two years (2017 and 2018) saw a modest decrease in the number of mass shootings and every other year has seen growth.  Deaths decreased modestly in two years (2017 and 2018), but increased in all other years, and injuries only saw one year of decrease (2018)
+Only two years (2017 and 2018) saw a modest decrease in the number of mass shootings and every other year has seen growth.  Deaths decreased modestly in two years (2017 and 2018), but increased in all other years, and injuries only saw one year of decrease (2018).
 
 ```{r growth rate graph, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
 gr_table %>% 
@@ -585,8 +587,6 @@ This is interesting given that the days of the week and the months tests were bo
 We noted before that there are seasonal trends in the data, so I am going to bring those forward using moving averages which are simply an average of the volume of mass shootings over a given window of time.  In this case, I will use two windows - one for a six month moving average to highlight the seasonality, and a second moving average of 12 months to highlight the trend of increasing numbers of mass shootings.  We appear to have a new post-pandemic normal.
 
 ```{r moving averages, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
-#this creates a tibble we can use for the moving average analysis
-
 ma_tbl <- ms_tbl %>% 
     filter(incident_date < floor_date(Sys.Date(), "month")) %>% 
     arrange(incident_date) %>% 
@@ -672,7 +672,7 @@ Yes, `r state_count` states have not had mass shootings since these data were co
 
 ## States with the Most Mass Shootings
 
-Let's look a the number of mass shootings by state.  This gives us a look at totals.
+Let's look at the number of mass shootings by state.  This gives us a look at totals.
 
 ```{r state mass shooting volumes, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
 ms_tbl %>% 
@@ -708,7 +708,7 @@ top_states_for_time_series <- state_stats %>%
 
 The five states with the greatest number of mass shootings are: `r knitr::combine_words(top_five_states)`.
 
-We should consider proportionally how likely it is to encounter a mass shooting (or being injured or killed) instead of just looking at the total because each state has widely differing total populations.  In other words, given the population of a state, which states have the greatest number of mass shootings (or deaths or injuries) per person?  I will use the 2020 US decennial census population data by state and the number of incidents, injuries, and deaths by state in 2021.  I am including Washington, D.C. as a state.  N.B. Another way to approach this would be to sum all of the years compared to a 2020 population, but I elected to simply choose the most recent complete year on record.
+We should consider proportionally how likely it is to encounter a mass shooting (or being injured or killed) instead of just looking at the total because each state has widely differing total populations.  In other words, given the population of a state, which states have the greatest number of mass shootings (or deaths or injuries) per person?  I will use the 2020 US decennial census population data by state and the number of incidents, injuries, and deaths by state in 2021.  I am including Washington, D.C. as a state.  Another way to approach this would be to sum all of the years compared to a 2020 population, but I elected to simply choose the most recent complete year on record.
 
 ## Top Mass Shootings States Per Capita
 
@@ -873,20 +873,20 @@ ranked_cities %>%
 
 The initial reason I started this project was to work on a web scraping endeavor.  Scraping the initial mass shooting data was very straightforward, and I learned a great deal about how to accomplish that process in R.  
 
-However, as things progressed and I wanted to mine more of the incident data, I discovered that some pages of the GVA website has a robot checking algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using RSelenium.  The website still recognized that I was using a controlled browser, and it denied my access.  
+However, as things progressed and I wanted to mine more of the incident data, I discovered that some pages of the GVA website has a robot checking algorithm in place to verify that a browser is likely a human and not a bot.  There were several helpful directives online regarding using selenium as a headless browser, which I started doing in using the RSelenium package.  The website still recognized that I was using a controlled browser, and it denied my access.  
 
 Eventually, I discovered that I needed to adjust some of the Chrome options, and I was not able to make that happen in R, so I knew that I needed to switch to Python from the many solutions I found online.  I did just that, and it was a solid learning experience for me as I have been working on enhancing my Python skills, and this was a practical avenue to move forward with that objective.
 
-The following took a few weeks of research, and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did question pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best latitude and longitude information, and an earlier attempt to get coordinates using the addresses was not the best given that many of the addresses are missing detailed information.  GVA seems to have better data on the coordinates behind the scenes.
+The following took a few weeks of research, and there were a lot of late nights and weekends put into this effort.  In all, it was worth it, but I did question pursuing this at times given the level of effort just to scrape these pages.  I really wanted to get the best latitude and longitude information, and an earlier attempt to get coordinates using the gecoded addresses was not the best given that many of the addresses are missing detailed information.  GVA seems to have better data on the coordinates behind the scenes.
 
-I started by pulling the incident IDs from the GVA data which then become part of the URL for the incident-specific information.  This was from the original pull for all incidents, but after gathering all of the historical data, I only need to update with new incidents moving forward.
+I started by pulling the incident IDs from the GVA data which then become part of the URL for the incident-specific information.  This was from the original data pull for all incidents, but after gathering all of the historical data, I only need to update with new incidents moving forward.
 
 ```{r, include=TRUE, eval=FALSE}
 incident_ids <- ms_tbl %>%
     distinct(incident_id) # get a list of all of the incident IDs
 
 geo_locations_incidents_tbl <- incident_ids %>%
-    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}")) # create a tibble with all of the URLs needed
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
 ```
 
 Here we only need to evaluate on the new incidents and then look up those geolocations.
@@ -899,12 +899,12 @@ new_incident_ids <- ms_tbl %>%
     distinct(incident_id)
 
 new_geo_locations_incidents_tbl <- new_incident_ids %>%
-    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}")) # create a tibble with all of the URLs needed
+    mutate(pages = str_glue("https://www.gunviolencearchive.org/incident/{incident_id}"))
 ```
 
 ## Webscraping with Python
 
-Now we can scrape using Python which gives us a lot more flexibility than RSelenium does (at least as far as I was able to discern).
+Now we can scrape using Python which gives us more flexibility than RSelenium did (at least as far as I was able to discern).
 
 ```{python, include=TRUE, eval=FALSE}
 
@@ -930,7 +930,7 @@ driver = webdriver.Chrome(options=options) # this established the browser
 first_page = "https://www.gunviolencearchive.org/incident/882422" # this is a default page to start with
 driver.get(first_page) # this opens the URL in the established browser
 
-# from here, I had to click on a second tab manually, and open another page on the same website which cleared the bot limiter I was running into
+# from here, I had to click on a second tab manually, and open another page on the same website which cleared the bot checker I was running into
 
 # then, I was able to run the loop as follows
 
@@ -955,7 +955,7 @@ driver.close() # this closes the session.
 
 ```
 
-Pull the Python object into R, and back up the scraped data in case of R crash.
+Pull the Python object into R, and back up the scraped data in case of R crash en route.
 
 ```{r, include=TRUE, eval=FALSE}
 geo_data <- py$df # this command moves a Python object into an R object...Reticulate is pretty sweet!
@@ -1008,6 +1008,8 @@ ms_tbl_map_prep <- ms_tbl_map_data %>%
 
 ## Mapping Incidents with Leaflet
 
+Leaflet creates an interactive map that lets you zoom in and out and also mouse over incidents to get more information.
+
 ```{r, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, out.width="100%", out.height="100%"}
 ms_tbl_map_prep %>% 
     leaflet(height = 1000, width = 1000) %>%
@@ -1047,15 +1049,15 @@ plot_usmap(fill = "goldenrod1", alpha = 0.8) +
 
 # Time Series Modeling
 
-Time series modeling is a form of machine learning that uses clues in the time series data to create predictive models about what might happen based upon events that have already occurred.  I will use the top nine highest mass shooting states to create predicive time series models.  Perhaps leaders from these states can elaborate on these models to help identify when things might get worse and then deploy community resources and programs to try to reduce the number of mass shootings.
+Time series modeling is a form of machine learning that uses clues in the time series data to create predictive models about what might happen based upon events that have already occurred.  I will use data from some of the highest mass shooting states to create predictive time series models.  Perhaps leaders from these states can elaborate on these models to help identify when things might get worse and then deploy community resources and programs to try to reduce the number of mass shootings.
 
 ## Prepare and Nest Time Series Data
 
-We are planning on projecting out 12 months, and the following code sets up the data so that we can iterate over it with several different models and then pick the best ones for the forecasts.
+I am planning on projecting out 12 months, and the following code sets up the data so that we can iterate over it with several different models and then pick the best one for the forecasts.
 
-One of the coolest features of R is that you can create data tables within data tables meaning that a column which typically contains data about a record can instead contain an entire data set.  These are called nested data sets, and they are really lists within lists.  Data tables and data frames and tibbles are all different simply names for lists.  Nested lists are super useful for keeping data tidy and particularly for iterative modeling of many types.
+One of the coolest features of R is that you can create data tables within data tables meaning that a column which typically contains data about a record can instead contain an entire data set.  These are called nested data sets, and they are really lists within lists.  Data tables and data frames and tibbles are all simply different names for lists.  Nested lists are super useful for keeping data tidy and particularly for iterative modeling of many types.
 
-A convenient aspect of the modeltime package is that it automatically holds out testing data for you so that you don't have to create training and testing data.  This is especially nice with time series data because the testing data is the most recent data as opposed to non-time series modeling where a random set of data are withheld during the training process.
+A convenient aspect of the modeltime package is that it automatically holds out testing data for you so that you don't have to create separate training and testing data albeit not that complicated to do.  This is especially nice with time series data because the testing data is the most recent data as opposed to non-time series modeling where a random set of data are withheld during the training process.
 
 ```{r, include=TRUE, eval=FALSE, warning=FALSE, message=FALSE}
 future_date <- 12
@@ -1160,7 +1162,7 @@ nested_modeltime_tbl %>%
 
 ## Choose the best models
 
-We select the most accurate models based upon the mean absolute error metric.
+We select the most accurate models based upon the mean absolute error (MAE) metric.  MAE expresses the relative predictive error of models, and we select the models with the lowest relative error.
 
 ```{r, include=TRUE, eval=FALSE}
 nested_best_tbl <- nested_modeltime_tbl %>%
@@ -1171,7 +1173,7 @@ write_rds(nested_best_tbl, "best_models.rds")
 
 ## Visualize Best Models
 
-Here is a final look at the best model's predictions.
+Here is a final look at the best model's predictions compared with the actual data that we held back.
 
 ```{r, include=TRUE, eval=TRUE, out.width="100%", out.height="100%"}
 nested_best_tbl <- read_rds("best_models.rds")
@@ -1184,7 +1186,7 @@ nested_best_tbl %>%
 
 ## Final Model Refits
 
-This is the final step in the modeling process where we fit the most accurate models to the data.
+This is the final step in the modeling process where we fit the most accurate models to the data including the data that we held back.  The line represents the expected value or average of the forecast, and the gray area represents the 95% confidence intervals around the prediction.  Obviously, no forecast will be absolutely correct, so the confidence intervals give us a reasonable expectation around where the true value will appear in the future.
 
 ```{r, include=TRUE, eval=FALSE}
 nested_best_refit_tbl <- nested_best_tbl %>%
@@ -1215,9 +1217,9 @@ nested_best_refit_tbl %>%
 
 # Summary
 
-Mass shootings incidents are increasing since 2014 at an average annual rate of 14%.  Since 2020, the number of mass shootings has increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
+Mass shootings incidents are increasing since 2014 at an average annual rate of 14%.  Since 2020, the number of mass shootings have increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
 
-Saturdays and Sundays tend to have more mass shootings and account for about half of the mass shooting weekdays where Monday through Friday account for the remaining half.
+Saturdays and Sundays tend to have more mass shootings and account for about half of the mass shooting weekdays whereas Monday through Friday account for the remaining half.
 
 Summer months account for 35% of mass shootings where winter months account for 15% leaving fall and spring similar at approximately 25% each proportionately.  
 
@@ -1225,7 +1227,7 @@ Only `r state_count` of fifty states since 2014 have not had a mass shooting - `
 
 The top five states (including Washington, DC) with the most total mass shootings since 2014 are `r knitr::combine_words(top_five_states)`.
 
-Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C.; in fact, you are three times more likely on a per capita basis than the next closest state which is Delaware in 2021.  
+Per capita, Washington, D.C. experiences the most mass shootings, injuries, and deaths.  This means that on a per person basis, you are more likely to experience a mass shooting in D.C.  In fact, you are three times more likely on a per capita basis than the next closest state which is Delaware in 2021.  
 
 Illinois, which is highest in total volume, also makes the list for states with the highest mass shootings, injuries, and deaths per capita.  The other top volume states, California, Texas, Florida, and Pennsylvania do not share that distinction in 2021.
 
