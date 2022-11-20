@@ -17,7 +17,8 @@ editor_options:
 
 <style type="text/css">
 .main-container {
-  max-width: 100%;
+  width: 100%;
+  max-width: 2000px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -1186,7 +1187,7 @@ nested_best_tbl %>%
 
 ## Final Model Refits
 
-This is the final step in the modeling process where we fit the most accurate models to the data including the data that we held back.  The line represents the expected value or average of the forecast, and the gray area represents the 95% confidence intervals around the prediction.  Obviously, no forecast will be absolutely correct, so the confidence intervals give us a reasonable expectation around where the true value will appear in the future.
+This is the final step in the modeling process where we fit the most accurate models to the data including the data that we held back.
 
 ```{r, include=TRUE, eval=FALSE}
 nested_best_refit_tbl <- nested_best_tbl %>%
@@ -1202,7 +1203,7 @@ write_rds(nested_best_refit_tbl, "nested_best_refit_tbl.rds")
 
 ## Visualize the Forecasts
 
-Here are the final future forecasts by state.
+Here are the final future forecasts by state.  The line represents the expected value or average of the forecast, and the gray area represents the 95% confidence intervals around the prediction.  Obviously, no forecast will be absolutely correct, so the confidence intervals give us a reasonable expectation around where the true value will appear in the future.
 
 ```{r, include=TRUE, eval=TRUE, out.width="100%", out.height="100%"}
 nested_best_refit_tbl <- read_rds("nested_best_refit_tbl.rds")
