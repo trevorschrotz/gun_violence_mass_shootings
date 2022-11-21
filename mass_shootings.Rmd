@@ -36,7 +36,7 @@ The beauty of R is that I will share this analysis with everyone, and, if anyone
 
 ## Preface
 
-What follows is a analysis of mass shooting phenomena in the US.
+What follows is an analysis of mass shooting phenomena in the US.
 
 Guns.  Gun rights.  Gun violence.  These are highly contentious and controversial issues that come with a host of tuning effects on individual opinions and beliefs.  
 
