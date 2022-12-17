@@ -92,6 +92,8 @@ plan(strategy = cluster,
      workers  = parallel::makeCluster(n_cores))
 
 api_key <- Sys.getenv("CENSUS_API_KEY")
+
+Sys.getenv()
 ```
 
 ## Sourcing Data from the GVA
@@ -913,13 +915,17 @@ Now we can scrape using Python which gives us more flexibility than RSelenium di
 # pip install selenium
 # pip install chromedriver
 # pip install beautifulsoup4
+# pip install webdriver_auto_update
 
 from selenium import webdriver
+import chromedriver_autoinstaller
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
 from time import sleep
 import pandas as pd
+
+chromedriver_autoinstaller.install()
 
 options = Options() # these are the options needed to hide that the browser was being controlled by a computer and not a human
 options.add_experimental_option("excludeSwitches", ["enable-automation"])
