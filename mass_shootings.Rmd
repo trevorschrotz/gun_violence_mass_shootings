@@ -786,7 +786,7 @@ top_cities_incidents <- ms_tbl %>%
     ungroup()
 
 top_cities_incidents %>% 
-    ggplot(aes(year, number_incidents, fill = city_or_county)) +
+    ggplot(aes(factor(year), number_incidents, fill = city_or_county)) +
     geom_col(alpha = 0.9) +
     geom_text(aes(label = number_incidents), fill = "white", vjust = 1.5, size = 2, color = "white") +
     facet_wrap(~ fct_reorder(str_c(city_or_county, state, sep = ", "), -number_incidents, sum), scales = "free_y") +
@@ -801,7 +801,7 @@ top_cities_incidents %>%
          caption = "current incomplete year removed") +
     theme(legend.position = "none",
           strip.text.x = element_text(size = 6),
-          axis.text.x = element_text(size = 5),
+          axis.text.x = element_text(size = 5, angle = 45),
           axis.text.y = element_text(size = 5))
 ```
 
