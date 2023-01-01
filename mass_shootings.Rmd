@@ -92,8 +92,6 @@ plan(strategy = cluster,
      workers  = parallel::makeCluster(n_cores))
 
 api_key <- Sys.getenv("CENSUS_API_KEY")
-
-Sys.getenv()
 ```
 
 ## Sourcing Data from the GVA
@@ -358,7 +356,7 @@ gr_table %>%
 
 ## Total Growth Rate
 
-This is the average growth rate over the entire period of time in total.  Effectively, you can read this summary as the annual average increase in the number of incidents, deaths, and injuries since 2014.  On average, mass shoooting incidents, deaths, and injuries have been growing at a rate of ~14% per year since 2014.
+This is the average growth rate over the entire period of time in total.  Effectively, you can read this summary as the annual average increase in the number of incidents, deaths, and injuries since 2014.  On average, mass shooting incidents, deaths, and injuries have been growing at a rate of 11% to 12% per year since 2014.
 
 ```{r total growth rate table, include=TRUE, warning=FALSE, message=FALSE, out.width="100%", out.height="100%"}
 gr_table %>% 
@@ -1224,7 +1222,7 @@ nested_best_refit_tbl %>%
 
 # Summary
 
-Mass shootings incidents are increasing since 2014 at an average annual rate of 14%.  Since 2020, the number of mass shootings have increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
+Mass shootings incidents are increasing since 2014 at an average annual rate of ~11% to 12%.  Since 2020, the number of mass shootings have increased, and we appear to have a new higher 'normal' environment of mass shootings in the US.
 
 Saturdays and Sundays tend to have more mass shootings and account for about half of the mass shooting weekdays whereas Monday through Friday account for the remaining half.
 
