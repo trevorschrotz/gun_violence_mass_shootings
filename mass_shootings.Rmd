@@ -339,7 +339,7 @@ gr_table %>%
     geom_point(size = 5) +
     geom_text(aes(label = percent(value, accuracy = 0.1)), size = 3, color = "black", vjust = -1.2) +
     geom_hline(yintercept = 0, color = "gray30") +
-    expand_limits(x = c(2014.5, 2021.5), y = c(-0.25, 0.5)) +
+    expand_limits(x = c(2014.5, 2022.5), y = c(-0.25, 0.5)) +
     scale_y_continuous(labels = label_percent(accuracy = 1)) +
     theme_tq() +
     scale_color_tq() +
