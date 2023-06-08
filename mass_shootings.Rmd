@@ -170,6 +170,16 @@ ms_scrape_2019 <- ms_pages_2019 %>%
 
 ms_2019_tbl <- map_df(ms_scrape_2019$scrape, ~ html_table(.x))
 
+#2020
+ms_pages_2020 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2020",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:24),"&year=2020")))
+
+ms_scrape_2020 <- ms_pages_2020 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2020_tbl <- map_df(ms_scrape_2020$scrape, ~ html_table(.x))
+
 
 #2019 through 2022
 ms_pages_2019_2022 <- 
@@ -194,6 +204,7 @@ complete_tbl <- ms_2014_tbl %>%
     bind_rows(ms_2017_tbl) %>%
     bind_rows(ms_2018_tbl) %>%
     bind_rows(ms_2019_tbl) %>%
+    bind_rows(ms_2020_tbl) |> 
     bind_rows(ms_2019_2022_tbl) %>%
     distinct()
 
@@ -230,8 +241,8 @@ group_function <- function(df, ...) {
     output <- df %>% 
         group_by(...) %>% 
         summarize(n_incidents = n(),
-                  n_deaths = sum(number_killed, na.rm = T),
-                  n_injuries = sum(number_injured, na.rm = T),
+                  n_deaths = sum(number_victims_killed + number_subjects_suspects_killed, na.rm = T),
+                  n_injuries = sum(number_victims_injured + number_subjects_suspects_injured, na.rm = T),
                   .groups = "drop")
     
     return(output)
@@ -765,8 +776,8 @@ top_cities <- ms_tbl %>%
     filter(year < year(Sys.Date())) %>% 
     group_by(state, city_or_county) %>% 
     summarize(number_incidents = n(),
-              number_killed = sum(number_killed),
-              number_injured = sum(number_injured),
+               number_killed = sum(number_victims_killed + number_subjects_suspects_killed),
+              number_injured = sum(number_victims_injured + number_subjects_suspects_injured),
               .groups = "drop") %>% 
     slice_max(order_by = number_incidents, n = 12) %>% 
     distinct(state, city_or_county) %>% 
@@ -778,8 +789,8 @@ top_cities_incidents <- ms_tbl %>%
            city_list %in% top_cities$city_list) %>% 
     group_by(state, city_or_county, year) %>% 
     summarize(number_incidents = n(),
-              number_killed = sum(number_killed),
-              number_injured = sum(number_injured),
+              number_killed = sum(number_victims_killed + number_subjects_suspects_killed),
+              number_injured = sum(number_victims_injured + number_subjects_suspects_injured),
               .groups = "drop") %>% 
     complete(year, nesting(state, city_or_county), 
              fill = list(number_incidents = 0, number_killed = 0, number_injured = 0)) %>% 
