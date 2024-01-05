@@ -180,17 +180,47 @@ ms_scrape_2020 <- ms_pages_2020 %>%
 
 ms_2020_tbl <- map_df(ms_scrape_2020$scrape, ~ html_table(.x))
 
+#2021
+ms_pages_2021 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2021",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:27),"&year=2021")))
 
-#2019 through 2022
-ms_pages_2019_2022 <- 
-    tibble(pages = c("https://www.gunviolencearchive.org/mass-shooting",
-                                       str_c("https://www.gunviolencearchive.org/mass-shooting?page=",c(1:79))))
-
-
-ms_scrape_2019_2022 <- ms_pages_2019_2022 %>%
+ms_scrape_2021 <- ms_pages_2021 %>%
     mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
 
-ms_2019_2022_tbl <- map_df(ms_scrape_2019_2022$scrape, ~ html_table(.x))
+ms_2021_tbl <- map_df(ms_scrape_2021$scrape, ~ html_table(.x))
+
+#2022
+ms_pages_2022 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2022",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:25),"&year=2022")))
+
+ms_scrape_2022 <- ms_pages_2022 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2022_tbl <- map_df(ms_scrape_2022$scrape, ~ html_table(.x))
+
+#2023
+ms_pages_2023 <- 
+    tibble(pages = c("https://www.gunviolencearchive.org/reports/mass-shooting?year=2023",
+                                  str_c("https://www.gunviolencearchive.org/reports/mass-shooting?page=",c(1:26),"&year=2023")))
+
+ms_scrape_2023 <- ms_pages_2023 %>%
+    mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+
+ms_2023_tbl <- map_df(ms_scrape_2023$scrape, ~ html_table(.x))
+
+
+#Others
+# ms_pages_others <-
+#     tibble(pages = c("https://www.gunviolencearchive.org/mass-shooting",
+#                                        str_c("https://www.gunviolencearchive.org/mass-shooting?page=",c(1:79))))
+# 
+# 
+# ms_scrape_others <- ms_pages_others %>%
+#     mutate(scrape = map(.x = pages, .f = ~read_html(.x)))
+# 
+# ms_others_tbl <- map_df(ms_scrape_others$scrape, ~ html_table(.x))
 ```
 
 ## Data Preparation
@@ -198,14 +228,17 @@ ms_2019_2022_tbl <- map_df(ms_scrape_2019_2022$scrape, ~ html_table(.x))
 Once I have collected the different years, we can stack the scraped datasets, and then store the file locally so that we don't need to continually call on the website.
 
 ```{r, include=TRUE, eval=FALSE}
-complete_tbl <- ms_2014_tbl %>%
-    bind_rows(ms_2015_tbl) %>%
-    bind_rows(ms_2016_tbl) %>%
-    bind_rows(ms_2017_tbl) %>%
-    bind_rows(ms_2018_tbl) %>%
-    bind_rows(ms_2019_tbl) %>%
+complete_tbl <- ms_2014_tbl |> 
+    bind_rows(ms_2015_tbl) |> 
+    bind_rows(ms_2016_tbl) |> 
+    bind_rows(ms_2017_tbl) |> 
+    bind_rows(ms_2018_tbl) |> 
+    bind_rows(ms_2019_tbl) |> 
     bind_rows(ms_2020_tbl) |> 
-    bind_rows(ms_2019_2022_tbl) %>%
+    bind_rows(ms_2021_tbl) |> 
+    bind_rows(ms_2022_tbl) |> 
+    bind_rows(ms_2023_tbl) |> 
+    #bind_rows(ms_others_tbl) %>%
     distinct()
 
 write_rds(complete_tbl, "gva_data.rds")
@@ -241,8 +274,8 @@ group_function <- function(df, ...) {
     output <- df %>% 
         group_by(...) %>% 
         summarize(n_incidents = n(),
-                  n_deaths = sum(number_victims_killed + number_subjects_suspects_killed, na.rm = T),
-                  n_injuries = sum(number_victims_injured + number_subjects_suspects_injured, na.rm = T),
+                  n_deaths = sum(victims_killed + suspects_killed, na.rm = T),
+                  n_injuries = sum(victims_injured + suspects_injured, na.rm = T),
                   .groups = "drop")
     
     return(output)
@@ -678,7 +711,7 @@ no_mass_shooting_states <- tibble("state_code" = state.abb,
 state_count <- length(no_mass_shooting_states)
 ```
 
-Yes, `r state_count` states have not had mass shootings since these data were collected beginning in 2014: `r knitr::combine_words(no_mass_shooting_states)`
+Unfortunately, every US state has had a mass shooting.  When this project was completed at the end of 2022, there were two states that had not had a mass shooting since 2014.
 
 ## States with the Most Mass Shootings
 
@@ -691,7 +724,7 @@ ms_tbl %>%
     ggplot(aes(fct_reorder(state, n_incidents), n_incidents)) +
     geom_col(fill = "steelblue", color = "gray30", alpha = 0.8) +
     geom_text(aes(label = n_incidents), hjust = -0.1, size = 2.5) +
-    scale_y_continuous(limits = c(0, 450), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 500), expand = c(0, 0)) +
     coord_flip() +
     theme_tq() +
     labs(title = "States Ordered by Number of Mass Shootings",
@@ -732,7 +765,7 @@ us_state_pop_tbl <- get_decennial(geography = "state",
 per_capita_base <- 1e5
 
 per_capita_tbl <- ms_tbl %>% 
-    filter(year == 2022) %>% 
+    filter(year == 2023) %>% 
     group_function(state) %>% 
     group_by(state) %>% 
     inner_join(us_state_pop_tbl %>% 
@@ -756,7 +789,7 @@ per_capita_tbl %>%
     scale_y_continuous(label = label_comma(accuracy = 0.1)) +
     theme_tq() +
     scale_fill_tq() +
-    labs(title = "Per Capita Mass Shootings, Deaths, and Injuries by US State in 2022",
+    labs(title = "Per Capita Mass Shootings, Deaths, and Injuries by US State in 2023",
          x = "",
          y = "Per 100,000 People") +
     theme(axis.text.y = element_text(size = 6),
@@ -776,8 +809,8 @@ top_cities <- ms_tbl %>%
     filter(year < year(Sys.Date())) %>% 
     group_by(state, city_or_county) %>% 
     summarize(number_incidents = n(),
-               number_killed = sum(number_victims_killed + number_subjects_suspects_killed),
-              number_injured = sum(number_victims_injured + number_subjects_suspects_injured),
+               number_killed = sum(victims_killed + suspects_killed),
+              number_injured = sum(victims_injured + suspects_injured),
               .groups = "drop") %>% 
     slice_max(order_by = number_incidents, n = 12) %>% 
     distinct(state, city_or_county) %>% 
@@ -789,8 +822,8 @@ top_cities_incidents <- ms_tbl %>%
            city_list %in% top_cities$city_list) %>% 
     group_by(state, city_or_county, year) %>% 
     summarize(number_incidents = n(),
-              number_killed = sum(number_victims_killed + number_subjects_suspects_killed),
-              number_injured = sum(number_victims_injured + number_subjects_suspects_injured),
+              number_killed = sum(victims_killed + suspects_killed),
+              number_injured = sum(victims_injured + suspects_injured),
               .groups = "drop") %>% 
     complete(year, nesting(state, city_or_county), 
              fill = list(number_incidents = 0, number_killed = 0, number_injured = 0)) %>% 
@@ -830,8 +863,8 @@ ranked_cities <- ms_tbl %>%
     inner_join(us_states, by = "state") %>% 
     group_by(city = str_c(city_or_county, state_code, sep = ", ")) %>% 
     summarize(number_incidents = n(),
-              number_killed = sum(number_killed),
-              number_injured = sum(number_injured),
+              number_killed = sum(victims_killed + suspects_killed),
+              number_injured = sum(victims_injured + suspects_injured),
               min_year = min(year),
               max_year = max(year),
               .groups = "drop") %>% 
@@ -940,7 +973,7 @@ options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument("--profile-directory=Default")
 options.add_experimental_option("useAutomationExtension", False)
 
-driver = webdriver.Chrome(options=options) # this established the browser
+driver = webdriver.Chrome(options=options) # this establishes the browser
 first_page = "https://www.gunviolencearchive.org/incident/882422" # this is a default page to start with
 driver.get(first_page) # this opens the URL in the established browser
 
